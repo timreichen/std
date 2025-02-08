@@ -36,7 +36,6 @@ export const ALL: Comparator = {
 export const OPERATORS = [
   undefined,
   "=",
-  "!=",
   ">",
   ">=",
   "<",

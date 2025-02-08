@@ -53,8 +53,6 @@ function lessThanComparator(version: SemVer, comparator: Comparator): boolean {
     case "=":
     case undefined:
       return cmp < 0;
-    case "!=":
-      return false;
     case ">":
       return cmp <= 0;
     case "<":

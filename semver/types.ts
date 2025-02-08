@@ -21,7 +21,6 @@ export type ReleaseType =
 export type Operator =
   | undefined
   | "="
-  | "!="
   | ">"
   | ">="
   | "<"

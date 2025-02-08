@@ -55,8 +55,6 @@ function greaterThanComparator(
     case "=":
     case undefined:
       return cmp > 0;
-    case "!=":
-      return false;
     case ">":
       return false;
     case "<":
