@@ -54,7 +54,7 @@ function recognize(
  * @returns The extracted front matter and body content.
  */
 export function extract<T>(text: string): Extract<T> {
-  const formats = [...EXTRACT_REGEXP_MAP.keys()] as Format[];
+  const formats = [...EXTRACT_REGEXP_MAP.keys()];
   const format = recognize(text, formats);
   switch (format) {
     case "yaml":

@@ -65,18 +65,17 @@ export type { Format };
  * assertFalse(result);
  * ```
  */
-export function test(str: string, formats?: Format[]): boolean {
-  if (!formats) formats = [...EXTRACT_REGEXP_MAP.keys()] as Format[];
-
+export function test(
+  str: string,
+  formats: Format[] = [...EXTRACT_REGEXP_MAP.keys()],
+): boolean {
   for (const format of formats) {
     const regexp = EXTRACT_REGEXP_MAP.get(format);
     if (!regexp) {
       throw new TypeError(`Unable to test for ${format} front matter format`);
     }
     const match = regexp.exec(str);
-    if (match?.index === 0) {
-      return true;
-    }
+    if (match) return true;
   }
 
   return false;

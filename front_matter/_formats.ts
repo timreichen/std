@@ -52,13 +52,13 @@ export const EXTRACT_JSON_REGEXP = new RegExp(
   "is",
 );
 
-export const RECOGNIZE_REGEXP_MAP = new Map([
+export const RECOGNIZE_REGEXP_MAP = new Map<Format, RegExp>([
   ["yaml", RECOGNIZE_YAML_REGEXP],
   ["toml", RECOGNIZE_TOML_REGEXP],
   ["json", RECOGNIZE_JSON_REGEXP],
 ]);
 
-export const EXTRACT_REGEXP_MAP = new Map([
+export const EXTRACT_REGEXP_MAP = new Map<Format, RegExp>([
   ["yaml", EXTRACT_YAML_REGEXP],
   ["toml", EXTRACT_TOML_REGEXP],
   ["json", EXTRACT_JSON_REGEXP],
