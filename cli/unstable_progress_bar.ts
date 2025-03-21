@@ -7,18 +7,18 @@
 export interface ProgressBarFormatter {
   /**
    * A function that returns a formatted version of the duration.
-   * `[mm:ss] `
+   * `[mm:ss]`
    */
   styledTime: () => string;
   /**
    * A function that returns a formatted version of the data received.
-   * `[0.40/97.66 KiB] `
+   * `[0.40/97.66 KiB]`
    * @param fractions The number of decimal places the values should have.
    */
   styledData: (fractions?: number) => string;
   /**
    * The progress bar string.
-   * Default Style: `[###-------] `
+   * Default Style: `[###-------]`
    */
   progressBar: string;
   /**
@@ -168,7 +168,7 @@ export class ProgressBar {
       fillChar = "#",
       emptyChar = "-",
       clear = false,
-      fmt = (x) => x.styledTime() + x.progressBar + x.styledData(),
+      fmt = (x) => `${x.styledTime()} ${x.progressBar} ${x.styledData()} `,
       keepOpen = true,
     } = options;
     this.#value = value;
@@ -210,43 +210,43 @@ export class ProgressBar {
 
   async #print(): Promise<void> {
     const currentTime = performance.now();
-    const size = this.#value / this.#max * this.#barLength | 0;
-    const unit = this.#unit;
-    const rate = this.#rate;
-    const x: ProgressBarFormatter = {
-      styledTime() {
-        return "[" +
-          (this.time / 1000 / 60 | 0)
-            .toString()
-            .padStart(2, "0") +
-          ":" +
-          (this.time / 1000 % 60 | 0)
-            .toString()
-            .padStart(2, "0") +
-          "] ";
+
+    const value = this.#value;
+    const max = this.#max;
+    const fillChar = this.#fillChar;
+    const emptyChar = this.#emptyChar;
+    const barLength = this.#barLength;
+
+    const time = currentTime - this.#startTime;
+
+    const formatter = {
+      styledTime: () => {
+        const minutes = (time / 1000 / 60 | 0).toString().padStart(2, "0");
+        const seconds = (time / 1000 % 60 | 0).toString().padStart(2, "0");
+        return `[${minutes}:${seconds}]`;
       },
-      styledData: function (fractions = 2): string {
-        return "[" +
-          (this.value / rate).toFixed(fractions) +
-          "/" +
-          (this.max / rate).toFixed(fractions) +
-          " " +
-          unit +
-          "] ";
+      styledData: () => {
+        const rate = this.#rate;
+        const unit = this.#unit;
+        const currentData = (value / rate).toFixed(2);
+        const maxData = (max / this.#rate).toFixed(2);
+        return `[${currentData}/${maxData} ${unit}]`;
       },
-      progressBar: "[" +
-        this.#fillChar.repeat(size) +
-        this.#emptyChar.repeat(this.#barLength - size) +
-        "] ",
-      time: currentTime - this.#startTime,
+      get progressBar(): string {
+        const size = (value / max * barLength) | 0;
+        const fillChars = fillChar.repeat(size);
+        const emptyChars = emptyChar.repeat(barLength - size);
+        return `[${fillChars}${emptyChars}]`;
+      },
+      time,
       previousTime: this.#lastTime - this.#startTime,
-      value: this.#value,
+      value,
       previousValue: this.#lastValue,
-      max: this.#max,
+      max,
     };
     this.#lastTime = currentTime;
     this.#lastValue = this.#value;
-    await this.#writer.write("\r\u001b[K" + this.#fmt(x))
+    await this.#writer.write("\r\u001b[K" + this.#fmt(formatter))
       .catch(() => {});
   }
 
