@@ -9,13 +9,13 @@ export interface ProgressBarFormatter {
    * A function that returns a formatted version of the duration.
    * `[mm:ss] `
    */
-  styledTime: () => string;
+  styledTime: string;
   /**
    * A function that returns a formatted version of the data received.
    * `[0.40/97.66 KiB] `
    * @param fractions The number of decimal places the values should have.
    */
-  styledData: (fractions?: number) => string;
+  styledData: string;
   /**
    * The progress bar string.
    * Default Style: `[###-------] `
@@ -168,7 +168,7 @@ export class ProgressBar {
       fillChar = "#",
       emptyChar = "-",
       clear = false,
-      fmt = (x) => x.styledTime() + x.progressBar + x.styledData(),
+      fmt = (x) => x.styledTime + x.progressBar + x.styledData,
       keepOpen = true,
     } = options;
     this.#value = value;
@@ -214,7 +214,7 @@ export class ProgressBar {
     const unit = this.#unit;
     const rate = this.#rate;
     const x: ProgressBarFormatter = {
-      styledTime() {
+      get styledTime() {
         return "[" +
           (this.time / 1000 / 60 | 0)
             .toString()
@@ -225,11 +225,11 @@ export class ProgressBar {
             .padStart(2, "0") +
           "] ";
       },
-      styledData: function (fractions = 2): string {
+      get styledData(): string {
         return "[" +
-          (this.value / rate).toFixed(fractions) +
+          (this.value / rate).toFixed(2) +
           "/" +
-          (this.max / rate).toFixed(fractions) +
+          (this.max / rate).toFixed(2) +
           " " +
           unit +
           "] ";
