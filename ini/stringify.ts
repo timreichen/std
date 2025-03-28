@@ -22,7 +22,13 @@ export interface StringifyOptions {
    *
    * @default {false}
    */
-  pretty?: boolean;
+  spacing?: "padding" | "align";
+  /**
+   * Insert a newline after each section header.
+   *
+   * @default {false}
+   */
+  newline?: boolean;
   /**
    * Provide custom string conversion for the value in a key/value pair.
    * Similar to the
@@ -110,26 +116,62 @@ export function stringify(
 ): string {
   const {
     replacer = defaultReplacer,
-    pretty = false,
+    spacing = false,
+    newline = false,
     lineBreak = "\n",
   } = options;
-  const assignment = pretty ? " = " : "=";
+  const assignment = spacing ? " = " : "=";
 
+  let paddingLength = 0;
   const entries = Object.entries(object).sort(sort);
-
-  const lines = [];
-  for (const [key, value] of entries) {
-    if (isPlainObject(value)) {
-      const sectionName = key;
-      lines.push(`[${sectionName}]`);
-      for (const [key, val] of Object.entries(value)) {
-        const line = `${key}${assignment}${replacer(key, val, sectionName)}`;
-        lines.push(line);
+  if (spacing === "align") {
+    for (const [key, value] of entries) {
+      if (key.length > paddingLength) {
+        paddingLength = key.length;
       }
-    } else {
-      const line = `${key}${assignment}${replacer(key, value)}`;
-      lines.push(line);
+      if (isPlainObject(value)) {
+        for (const key of Object.keys(value)) {
+          if (key.length > paddingLength) {
+            paddingLength = key.length;
+          }
+        }
+      }
+      if (key.length > paddingLength) {
+        paddingLength = key.length;
+      }
     }
   }
-  return lines.join(lineBreak);
+
+  let result = "";
+
+  for (const [key, value] of entries) {
+    if (result.length) result += lineBreak;
+    // if (lines.length && newline) lines.push(lineBreak);
+    if (isPlainObject(value)) {
+      const sectionName = key;
+      result += `[${sectionName}]`;
+      for (const [key, val] of Object.entries(value)) {
+        const padding = paddingLength
+          ? " ".repeat(paddingLength - key.length)
+          : "";
+        result += lineBreak;
+        const value = replacer(key, val, sectionName);
+        result += `${key}${padding}${assignment}${value}`;
+      }
+      if (newline) result += lineBreak;
+    } else {
+      const padding = paddingLength
+        ? " ".repeat(paddingLength - key.length)
+        : "";
+      result += `${key}${padding}${assignment}${replacer(key, value)}`;
+      if (newline) result += lineBreak;
+    }
+  }
+  return result;
 }
+
+console.log(stringify({
+  foo: { bar: true, baz: false },
+  john: { testicle: true, jane: false },
+  global: true,
+}, { newline: true, spacing: "padding" }));

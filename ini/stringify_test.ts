@@ -15,7 +15,7 @@ Deno.test({
   name: "stringify()",
   fn() {
     assertValidStringify({ a: "b" }, `a=b`);
-    assertValidStringify({ a: "b" }, `a = b`, { pretty: true });
+    assertValidStringify({ a: "b" }, `a = b`, { spacing: "padding" });
     assertValidStringify(
       { a: "b", section: { c: "d" }, e: "f" },
       `a=b\ne=f\n[section]\nc=d`,
@@ -36,7 +36,7 @@ Deno.test({
     }, `keyA=1977-05-25\n[section1]\nkeyA=100`);
 
     assertValidStringify({ a: 100 }, `a=100`);
-    assertValidStringify({ a: 100 }, `a = 100`, { pretty: true });
+    assertValidStringify({ a: 100 }, `a = 100`, { spacing: "padding" });
     assertValidStringify({ a: "123foo" }, `a=123foo`);
     assertValidStringify({ a: "foo" }, `a=foo`);
     assertValidStringify({ a: true }, `a=true`);
