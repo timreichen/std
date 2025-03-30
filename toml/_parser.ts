@@ -70,31 +70,29 @@ export class Scanner {
     }
   }
 
+  #skipComment() {
+    if (this.char() !== "#") return;
+    this.next();
+    for (const _ of this) {
+      if (this.isCurrentCharEOL()) break;
+    }
+  }
   /**
    * Move position until current char is not a whitespace, EOL, or comment.
-   * @param options.inline - skip only whitespaces
+   * @param options.skipComments - skip comments also
    */
-  nextUntilChar(
-    options: { inline?: boolean; comment?: boolean } = { comment: true },
-  ) {
-    if (options.inline) {
-      while (this.#whitespace.test(this.char()) && !this.eof()) {
-        this.next();
-      }
-    } else {
-      while (!this.eof()) {
-        const char = this.char();
-        if (this.#whitespace.test(char) || this.isCurrentCharEOL()) {
-          this.next();
-        } else if (options.comment && this.char() === "#") {
-          // entering comment
-          while (!this.isCurrentCharEOL() && !this.eof()) {
-            this.next();
-          }
-        } else {
-          break;
-        }
-      }
+  nextUntilChar(options: { skipComments?: boolean } = { skipComments: true }) {
+    for (const char of this) {
+      if (this.#whitespace.test(char)) continue;
+      if (this.isCurrentCharEOL()) continue;
+      if (options.skipComments && this.char() === "#") this.#skipComment();
+      else break;
+    }
+  }
+
+  skipWhitespaces() {
+    for (const char of this) {
+      if (!this.#whitespace.test(char)) break;
     }
     // Invalid if current char is other kinds of whitespace
     if (!this.isCurrentCharEOL() && /\s/.test(this.char())) {
@@ -122,6 +120,13 @@ export class Scanner {
 
   isCurrentCharEOL() {
     return this.char() === "\n" || this.slice(0, 2) === "\r\n";
+  }
+
+  *[Symbol.iterator]() {
+    while (!this.eof()) {
+      yield this.char();
+      this.next();
+    }
   }
 }
 
@@ -309,10 +314,10 @@ function surround<T>(
 
 function character(str: string) {
   return (scanner: Scanner): ParseResult<void> => {
-    scanner.nextUntilChar({ inline: true });
+    scanner.skipWhitespaces();
     if (scanner.slice(0, str.length) !== str) return failure();
     scanner.next(str.length);
-    scanner.nextUntilChar({ inline: true });
+    scanner.skipWhitespaces();
     return success(undefined);
   };
 }
@@ -326,7 +331,7 @@ const FLOAT_REGEXP = /[0-9_\.e+\-]/i;
 const END_OF_VALUE_REGEXP = /[ \t\r\n#,}\]]/;
 
 export function bareKey(scanner: Scanner): ParseResult<string> {
-  scanner.nextUntilChar({ inline: true });
+  scanner.skipWhitespaces();
   if (!scanner.char() || !BARE_KEY_REGEXP.test(scanner.char())) {
     return failure();
   }
@@ -385,7 +390,7 @@ function escapeSequence(scanner: Scanner): ParseResult<string> {
 }
 
 export function basicString(scanner: Scanner): ParseResult<string> {
-  scanner.nextUntilChar({ inline: true });
+  scanner.skipWhitespaces();
   if (scanner.char() !== '"') return failure();
   scanner.next();
   const acc = [];
@@ -411,21 +416,19 @@ export function basicString(scanner: Scanner): ParseResult<string> {
 }
 
 export function literalString(scanner: Scanner): ParseResult<string> {
-  scanner.nextUntilChar({ inline: true });
+  scanner.skipWhitespaces();
   if (scanner.char() !== "'") return failure();
   scanner.next();
   const acc: string[] = [];
-  while (scanner.char() !== "'" && !scanner.eof()) {
-    if (scanner.char() === "\n") {
+  for (const char of scanner) {
+    if (char === "'") break;
+    if (char === "\n") {
       throw new SyntaxError("Single-line string cannot contain EOL");
     }
-    acc.push(scanner.char());
-    scanner.next();
+    acc.push(char);
   }
   if (scanner.eof()) {
-    throw new SyntaxError(
-      `Single-line string is not closed:\n${acc.join("")}`,
-    );
+    throw new SyntaxError(`Single-line string is not closed:\n${acc.join("")}`);
   }
   scanner.next(); // skip last "'"
   return success(acc.join(""));
@@ -434,7 +437,7 @@ export function literalString(scanner: Scanner): ParseResult<string> {
 export function multilineBasicString(
   scanner: Scanner,
 ): ParseResult<string> {
-  scanner.nextUntilChar({ inline: true });
+  scanner.skipWhitespaces();
   if (scanner.slice(0, 3) !== '"""') return failure();
   scanner.next(3);
   if (scanner.char() === "\n") {
@@ -449,11 +452,11 @@ export function multilineBasicString(
     // line ending backslash
     if (scanner.slice(0, 2) === "\\\n") {
       scanner.next();
-      scanner.nextUntilChar({ comment: false });
+      scanner.nextUntilChar({ skipComments: false });
       continue;
     } else if (scanner.slice(0, 3) === "\\\r\n") {
       scanner.next();
-      scanner.nextUntilChar({ comment: false });
+      scanner.nextUntilChar({ skipComments: false });
       continue;
     }
     const escapedChar = escapeSequence(scanner);
@@ -482,7 +485,7 @@ export function multilineBasicString(
 export function multilineLiteralString(
   scanner: Scanner,
 ): ParseResult<string> {
-  scanner.nextUntilChar({ inline: true });
+  scanner.skipWhitespaces();
   if (scanner.slice(0, 3) !== "'''") return failure();
   scanner.next(3);
   if (scanner.char() === "\n") {
@@ -493,14 +496,12 @@ export function multilineLiteralString(
     scanner.next(2);
   }
   const acc: string[] = [];
-  while (scanner.slice(0, 3) !== "'''" && !scanner.eof()) {
-    acc.push(scanner.char());
-    scanner.next();
+  for (const char of scanner) {
+    if (scanner.slice(0, 3) === "'''") break;
+    acc.push(char);
   }
   if (scanner.eof()) {
-    throw new SyntaxError(
-      `Multi-line string is not closed:\n${acc.join("")}`,
-    );
+    throw new SyntaxError(`Multi-line string is not closed:\n${acc.join("")}`);
   }
   // if ends with 4 `'`, push the fist `'` to string
   if (scanner.char(3) === "'") {
@@ -522,7 +523,7 @@ const symbolPairs: [string, unknown][] = [
   ["-nan", NaN],
 ];
 export function symbols(scanner: Scanner): ParseResult<unknown> {
-  scanner.nextUntilChar({ inline: true });
+  scanner.skipWhitespaces();
   const found = symbolPairs.find(([str]) =>
     scanner.slice(0, str.length) === str
   );
@@ -535,7 +536,7 @@ export function symbols(scanner: Scanner): ParseResult<unknown> {
 export const dottedKey = join(or([bareKey, basicString, literalString]), ".");
 
 export function integer(scanner: Scanner): ParseResult<number | string> {
-  scanner.nextUntilChar({ inline: true });
+  scanner.skipWhitespaces();
 
   // Handle binary, octal, or hex numbers
   const first2 = scanner.slice(0, 2);
@@ -588,9 +589,9 @@ export function integer(scanner: Scanner): ParseResult<number | string> {
     scanner.next();
   }
 
-  while (!scanner.eof() && /[0-9_]/.test(scanner.char())) {
+  for (const char of scanner) {
+    if (!/[0-9_]/.test(char)) break;
     acc.push(scanner.char());
-    scanner.next();
   }
 
   if (acc.length === 0 || (acc.length === 1 && /[+-]/.test(acc[0]!))) {
@@ -603,7 +604,7 @@ export function integer(scanner: Scanner): ParseResult<number | string> {
 }
 
 export function float(scanner: Scanner): ParseResult<number> {
-  scanner.nextUntilChar({ inline: true });
+  scanner.skipWhitespaces();
 
   // lookahead validation is needed for integer value is similar to float
   let position = 0;
@@ -620,9 +621,10 @@ export function float(scanner: Scanner): ParseResult<number> {
     acc.push(scanner.char());
     scanner.next();
   }
-  while (FLOAT_REGEXP.test(scanner.char()) && !scanner.eof()) {
-    acc.push(scanner.char());
-    scanner.next();
+
+  for (const char of scanner) {
+    if (!FLOAT_REGEXP.test(char)) break;
+    acc.push(char);
   }
 
   if (acc.length === 0) return failure();
@@ -633,7 +635,7 @@ export function float(scanner: Scanner): ParseResult<number> {
 }
 
 export function dateTime(scanner: Scanner): ParseResult<Date> {
-  scanner.nextUntilChar({ inline: true });
+  scanner.skipWhitespaces();
 
   let dateStr = scanner.slice(0, 10);
   // example: 1979-05-27
@@ -642,9 +644,9 @@ export function dateTime(scanner: Scanner): ParseResult<Date> {
 
   const acc = [];
   // example: 1979-05-27T00:32:00Z
-  while (/[ 0-9TZ.:+-]/.test(scanner.char()) && !scanner.eof()) {
-    acc.push(scanner.char());
-    scanner.next();
+  for (const char of scanner) {
+    if (!/[ 0-9TZ.:+-]/.test(char)) break;
+    acc.push(char);
   }
   dateStr += acc.join("");
   const date = new Date(dateStr.trim());
@@ -657,7 +659,7 @@ export function dateTime(scanner: Scanner): ParseResult<Date> {
 }
 
 export function localTime(scanner: Scanner): ParseResult<string> {
-  scanner.nextUntilChar({ inline: true });
+  scanner.skipWhitespaces();
 
   let timeStr = scanner.slice(0, 8);
   if (!/^(\d{2}):(\d{2}):(\d{2})/.test(timeStr)) return failure();
@@ -668,27 +670,28 @@ export function localTime(scanner: Scanner): ParseResult<string> {
   acc.push(scanner.char());
   scanner.next();
 
-  while (/[0-9]/.test(scanner.char()) && !scanner.eof()) {
-    acc.push(scanner.char());
-    scanner.next();
+  for (const char of scanner) {
+    if (!/[0-9]/.test(char)) break;
+    acc.push(char);
   }
   timeStr += acc.join("");
   return success(timeStr);
 }
 
 export function arrayValue(scanner: Scanner): ParseResult<unknown[]> {
-  scanner.nextUntilChar({ inline: true });
+  scanner.skipWhitespaces();
 
   if (scanner.char() !== "[") return failure();
   scanner.next();
 
   const array: unknown[] = [];
+
   while (!scanner.eof()) {
     scanner.nextUntilChar();
     const result = value(scanner);
     if (!result.ok) break;
     array.push(result.body);
-    scanner.nextUntilChar({ inline: true });
+    scanner.skipWhitespaces();
     // may have a next item, but trailing comma is allowed at array
     if (scanner.char() !== ",") break;
     scanner.next();
