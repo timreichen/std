@@ -6,11 +6,11 @@
  *
  * ```ts
  * import { assertEquals } from "@std/assert";
- * import { encodeBase32, type Uint8Array_ } from "@std/encoding/unstable-base32";
+ * import { encodeBase32 } from "@std/encoding/unstable-base32";
  *
  * assertEquals(encodeBase32("Hello World", "Base32"), "JBSWY3DPEBLW64TMMQ======");
  * assertEquals(
- *   encodeBase32(new TextEncoder().encode("Hello World") as Uint8Array_, "Base32"),
+ *   encodeBase32(new TextEncoder().encode("Hello World") as Uint8Array, "Base32"),
  *   "JBSWY3DPEBLW64TMMQ======",
  * );
  * ```
@@ -21,8 +21,6 @@
  * @module
  */
 
-import type { Uint8Array_ } from "./_types.ts";
-export type { Uint8Array_ };
 import { calcMax, decode, encode } from "./_common32.ts";
 export { calcMax };
 import { detach } from "./_common_detach.ts";
@@ -66,39 +64,39 @@ export type Base32Format = "Base32" | "Base32Hex" | "Base32Crockford";
  * @example Basic Usage
  * ```ts
  * import { assertEquals } from "@std/assert";
- * import { encodeBase32, type Uint8Array_ } from "@std/encoding/unstable-base32";
+ * import { encodeBase32 } from "@std/encoding/unstable-base32";
  *
  * assertEquals(encodeBase32("Hello World", "Base32"), "JBSWY3DPEBLW64TMMQ======");
  * assertEquals(
- *   encodeBase32(new TextEncoder().encode("Hello World") as Uint8Array_, "Base32"),
+ *   encodeBase32(new TextEncoder().encode("Hello World") as Uint8Array, "Base32"),
  *   "JBSWY3DPEBLW64TMMQ======",
  * );
  *
  * assertEquals(encodeBase32("Hello World", "Base32Hex"), "91IMOR3F41BMUSJCCG======");
  * assertEquals(
- *   encodeBase32(new TextEncoder().encode("Hello World") as Uint8Array_, "Base32Hex"),
+ *   encodeBase32(new TextEncoder().encode("Hello World") as Uint8Array, "Base32Hex"),
  *   "91IMOR3F41BMUSJCCG======",
  * );
  *
  * assertEquals(encodeBase32("Hello World", "Base32Crockford"), "91JPRV3F41BPYWKCCG======");
  * assertEquals(
- *   encodeBase32(new TextEncoder().encode("Hello World") as Uint8Array_, "Base32Crockford"),
+ *   encodeBase32(new TextEncoder().encode("Hello World") as Uint8Array, "Base32Crockford"),
  *   "91JPRV3F41BPYWKCCG======",
  * );
  * ```
  */
 export function encodeBase32(
-  input: string | Uint8Array_ | ArrayBuffer,
+  input: string | Uint8Array | ArrayBuffer,
   format: Base32Format = "Base32",
 ): string {
   if (typeof input === "string") {
-    input = new TextEncoder().encode(input) as Uint8Array_;
+    input = new TextEncoder().encode(input) as Uint8Array;
   } else if (input instanceof ArrayBuffer) {
     input = new Uint8Array(input);
   }
   const [output, i] = detach(
-    input as Uint8Array_,
-    calcMax((input as Uint8Array_).length),
+    input as Uint8Array,
+    calcMax((input as Uint8Array).length),
   );
   encode(output, i, 0, alphabet[format], padding);
   return new TextDecoder().decode(output);
@@ -145,7 +143,7 @@ export function encodeBase32(
  * ```
  */
 export function encodeRawBase32(
-  buffer: Uint8Array_,
+  buffer: Uint8Array,
   i: number,
   o: number,
   format: Base32Format = "Base32",
@@ -191,11 +189,11 @@ export function encodeRawBase32(
  * ```
  */
 export function decodeBase32(
-  input: string | Uint8Array_,
+  input: string | Uint8Array,
   format: Base32Format = "Base32",
-): Uint8Array_ {
+): Uint8Array {
   if (typeof input === "string") {
-    input = new TextEncoder().encode(input) as Uint8Array_;
+    input = new TextEncoder().encode(input) as Uint8Array;
   }
   return input.subarray(0, decode(input, 0, 0, rAlphabet[format], padding));
 }
@@ -221,12 +219,11 @@ export function decodeBase32(
  * import {
  *   decodeRawBase32,
  *   encodeBase32,
- *   type Uint8Array_,
  * } from "@std/encoding/unstable-base32";
  *
  * let buffer = new TextEncoder().encode(
  *   "data:url/fake," + encodeBase32(await Deno.readFile("./deno.lock"), "Base32"),
- * ) as Uint8Array_;
+ * ) as Uint8Array;
  *
  * const i = buffer.indexOf(",".charCodeAt(0)) + 1;
  * const o = decodeRawBase32(buffer, i, i, "Base32");
@@ -236,7 +233,7 @@ export function decodeBase32(
  * ```
  */
 export function decodeRawBase32(
-  buffer: Uint8Array_,
+  buffer: Uint8Array,
   i: number,
   o: number,
   format: Base32Format = "Base32",

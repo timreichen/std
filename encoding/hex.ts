@@ -28,8 +28,6 @@
 
 import { calcMax, decode, encode } from "./_common16.ts";
 import { detach } from "./_common_detach.ts";
-import type { Uint8Array_ } from "./_types.ts";
-export type { Uint8Array_ };
 
 const alphabet = new TextEncoder()
   .encode("0123456789abcdef");
@@ -56,12 +54,12 @@ new TextEncoder()
  */
 export function encodeHex(src: string | Uint8Array | ArrayBuffer): string {
   if (typeof src === "string") {
-    src = new TextEncoder().encode(src) as Uint8Array_;
+    src = new TextEncoder().encode(src) as Uint8Array;
   } else if (src instanceof ArrayBuffer) src = new Uint8Array(src).slice();
   else src = src.slice();
   const [output, i] = detach(
-    src as Uint8Array_,
-    calcMax((src as Uint8Array_).length),
+    src as Uint8Array,
+    calcMax((src as Uint8Array).length),
   );
   encode(output, i, 0, alphabet);
   return new TextDecoder().decode(output);
@@ -86,8 +84,8 @@ export function encodeHex(src: string | Uint8Array | ArrayBuffer): string {
  * );
  * ```
  */
-export function decodeHex(src: string): Uint8Array_ {
-  const output = new TextEncoder().encode(src) as Uint8Array_;
+export function decodeHex(src: string): Uint8Array {
+  const output = new TextEncoder().encode(src) as Uint8Array;
   // deno-lint-ignore no-explicit-any
   return new Uint8Array((output.buffer as any)
     .transfer(decode(output, 0, 0, rAlphabet)));

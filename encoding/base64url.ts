@@ -11,8 +11,6 @@
 
 import { calcMax, decode, encode } from "./_common64.ts";
 import { detach } from "./_common_detach.ts";
-import type { Uint8Array_ } from "./_types.ts";
-export type { Uint8Array_ };
 
 const padding = "=".charCodeAt(0);
 const alphabet = new TextEncoder()
@@ -40,12 +38,12 @@ export function encodeBase64Url(
   data: ArrayBuffer | Uint8Array | string,
 ): string {
   if (typeof data === "string") {
-    data = new TextEncoder().encode(data) as Uint8Array_;
+    data = new TextEncoder().encode(data) as Uint8Array;
   } else if (data instanceof ArrayBuffer) data = new Uint8Array(data).slice();
   else data = data.slice();
   const [output, i] = detach(
-    data as Uint8Array_,
-    calcMax((data as Uint8Array_).length),
+    data as Uint8Array,
+    calcMax((data as Uint8Array).length),
   );
   let o = encode(output, i, 0, alphabet, padding);
   o = output.indexOf(padding, o - 2);
@@ -74,8 +72,8 @@ export function encodeBase64Url(
  * );
  * ```
  */
-export function decodeBase64Url(b64url: string): Uint8Array_ {
-  const output = new TextEncoder().encode(b64url) as Uint8Array_;
+export function decodeBase64Url(b64url: string): Uint8Array {
+  const output = new TextEncoder().encode(b64url) as Uint8Array;
   // deno-lint-ignore no-explicit-any
   return new Uint8Array((output.buffer as any)
     .transfer(decode(output, 0, 0, rAlphabet, padding)));

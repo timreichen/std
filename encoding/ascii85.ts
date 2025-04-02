@@ -1,9 +1,6 @@
 // Copyright 2018-2025 the Deno authors. MIT license.
 // This module is browser compatible.
 
-import type { Uint8Array_ } from "./_types.ts";
-export type { Uint8Array_ };
-
 /**
  * Utilities for working with {@link https://en.wikipedia.org/wiki/Ascii85 | ascii85} encoding.
  *
@@ -159,7 +156,7 @@ export type DecodeAscii85Options = Omit<EncodeAscii85Options, "delimiter">;
 export function decodeAscii85(
   ascii85: string,
   options: DecodeAscii85Options = {},
-): Uint8Array_ {
+): Uint8Array {
   const { standard = "Adobe" } = options;
 
   // translate all encodings to most basic adobe/btoa one and decompress some special characters ("z" and "y")

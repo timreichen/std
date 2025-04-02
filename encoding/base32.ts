@@ -26,8 +26,6 @@
 
 import { calcMax, decode, encode } from "./_common32.ts";
 import { detach } from "./_common_detach.ts";
-import type { Uint8Array_ } from "./_types.ts";
-export type { Uint8Array_ };
 
 const padding = "=".charCodeAt(0);
 const alphabet = new TextEncoder()
@@ -53,12 +51,12 @@ alphabet.forEach((byte, i) => rAlphabet[byte] = i);
  */
 export function encodeBase32(data: ArrayBuffer | Uint8Array | string): string {
   if (typeof data === "string") {
-    data = new TextEncoder().encode(data) as Uint8Array_;
+    data = new TextEncoder().encode(data) as Uint8Array;
   } else if (data instanceof ArrayBuffer) data = new Uint8Array(data).slice();
   else data = data.slice();
   const [output, i] = detach(
-    data as Uint8Array_,
-    calcMax((data as Uint8Array_).length),
+    data as Uint8Array,
+    calcMax((data as Uint8Array).length),
   );
   encode(output, i, 0, alphabet, padding);
   return new TextDecoder().decode(output);
@@ -83,8 +81,8 @@ export function encodeBase32(data: ArrayBuffer | Uint8Array | string): string {
  * );
  * ```
  */
-export function decodeBase32(b32: string): Uint8Array_ {
-  const output = new TextEncoder().encode(b32) as Uint8Array_;
+export function decodeBase32(b32: string): Uint8Array {
+  const output = new TextEncoder().encode(b32) as Uint8Array;
   if (output.length % 8) {
     throw new TypeError(
       `Invalid base32 string: length (${output.length}) must be a multiple of 8`,

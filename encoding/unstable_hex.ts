@@ -6,11 +6,11 @@
  *
  * ```ts
  * import { assertEquals } from "@std/assert";
- * import { encodeHex, type Uint8Array_ } from "@std/encoding/unstable-hex";
+ * import { encodeHex } from "@std/encoding/unstable-hex";
  *
  * assertEquals(encodeHex("Hello World"), "48656c6c6f20576f726c64");
  * assertEquals(
- *   encodeHex(new TextEncoder().encode("Hello World") as Uint8Array_),
+ *   encodeHex(new TextEncoder().encode("Hello World") as Uint8Array),
  *   "48656c6c6f20576f726c64",
  * );
  * ```
@@ -21,8 +21,6 @@
  * @module
  */
 
-import type { Uint8Array_ } from "./_types.ts";
-export type { Uint8Array_ };
 import { calcMax, decode, encode } from "./_common16.ts";
 export { calcMax };
 import { detach } from "./_common_detach.ts";
@@ -49,26 +47,26 @@ new TextEncoder()
  * @example Basic Usage
  * ```ts
  * import { assertEquals } from "@std/assert";
- * import { encodeHex, type Uint8Array_ } from "@std/encoding/unstable-hex";
+ * import { encodeHex } from "@std/encoding/unstable-hex";
  *
  * assertEquals(encodeHex("Hello World"), "48656c6c6f20576f726c64");
  * assertEquals(
- *   encodeHex(new TextEncoder().encode("Hello World") as Uint8Array_),
+ *   encodeHex(new TextEncoder().encode("Hello World") as Uint8Array),
  *   "48656c6c6f20576f726c64",
  * );
  * ```
  */
 export function encodeHex(
-  input: string | Uint8Array_ | ArrayBuffer,
+  input: string | Uint8Array | ArrayBuffer,
 ): string {
   if (typeof input === "string") {
-    input = new TextEncoder().encode(input) as Uint8Array_;
+    input = new TextEncoder().encode(input) as Uint8Array;
   } else if (input instanceof ArrayBuffer) {
     input = new Uint8Array(input);
   }
   const [output, i] = detach(
-    input as Uint8Array_,
-    calcMax((input as Uint8Array_).length),
+    input as Uint8Array,
+    calcMax((input as Uint8Array).length),
   );
   encode(output, i, 0, alphabet);
   return new TextDecoder().decode(output);
@@ -114,7 +112,7 @@ export function encodeHex(
  * ```
  */
 export function encodeRawHex(
-  buffer: Uint8Array_,
+  buffer: Uint8Array,
   i: number,
   o: number,
 ): number {
@@ -146,10 +144,10 @@ export function encodeRawHex(
  * ```
  */
 export function decodeHex(
-  input: string | Uint8Array_,
-): Uint8Array_ {
+  input: string | Uint8Array,
+): Uint8Array {
   if (typeof input === "string") {
-    input = new TextEncoder().encode(input) as Uint8Array_;
+    input = new TextEncoder().encode(input) as Uint8Array;
   }
   return input.subarray(0, decode(input, 0, 0, rAlphabet));
 }
@@ -174,12 +172,11 @@ export function decodeHex(
  * import {
  *   decodeRawHex,
  *   encodeHex,
- *   type Uint8Array_,
  * } from "@std/encoding/unstable-hex";
  *
  * let buffer = new TextEncoder().encode(
  *   "data:url/fake," + encodeHex(await Deno.readFile("./deno.lock")),
- * ) as Uint8Array_;
+ * ) as Uint8Array;
  *
  * const i = buffer.indexOf(",".charCodeAt(0)) + 1;
  * const o = decodeRawHex(buffer, i, i);
@@ -189,7 +186,7 @@ export function decodeHex(
  * ```
  */
 export function decodeRawHex(
-  buffer: Uint8Array_,
+  buffer: Uint8Array,
   i: number,
   o: number,
 ): number {

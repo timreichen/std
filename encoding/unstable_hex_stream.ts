@@ -25,8 +25,6 @@
  * @module
  */
 
-import type { Uint8Array_ } from "./_types.ts";
-export type { Uint8Array_ };
 import {
   calcMax,
   decodeRawHex as decode,
@@ -34,7 +32,7 @@ import {
 } from "./unstable_hex.ts";
 import { detach } from "./_common_detach.ts";
 
-type Expect<T> = T extends "bytes" ? Uint8Array_ : string;
+type Expect<T> = T extends "bytes" ? Uint8Array : string;
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -65,8 +63,8 @@ const decoder = new TextDecoder();
  */
 export class HexEncoderStream<T extends "string" | "bytes">
   extends TransformStream<
-    Uint8Array_,
-    T extends "bytes" ? Uint8Array_ : string
+    Uint8Array,
+    T extends "bytes" ? Uint8Array : string
   > {
   /**
    * Constructs a new instance.
@@ -74,7 +72,7 @@ export class HexEncoderStream<T extends "string" | "bytes">
    * @param options The options for the hexadecimal stream.
    */
   constructor(options: { output?: T } = {}) {
-    const decode = function (): (input: Uint8Array_) => Expect<T> {
+    const decode = function (): (input: Uint8Array) => Expect<T> {
       if (options.output === "bytes") return (x) => x as Expect<T>;
       return (x) => decoder.decode(x) as Expect<T>;
     }();
@@ -117,8 +115,8 @@ export class HexEncoderStream<T extends "string" | "bytes">
  */
 export class HexDecoderStream<T extends "string" | "bytes">
   extends TransformStream<
-    T extends "bytes" ? Uint8Array_ : string,
-    Uint8Array_
+    T extends "bytes" ? Uint8Array : string,
+    Uint8Array
   > {
   /**
    * Constructs a new instance.
@@ -126,9 +124,9 @@ export class HexDecoderStream<T extends "string" | "bytes">
    * @param options The options of the hexadecimal stream.
    */
   constructor(options: { input?: T } = {}) {
-    const encode = function (): (input: Expect<T>) => Uint8Array_ {
-      if (options.input === "bytes") return (x) => x as Uint8Array_;
-      return (x) => encoder.encode(x as string) as Uint8Array_;
+    const encode = function (): (input: Expect<T>) => Uint8Array {
+      if (options.input === "bytes") return (x) => x as Uint8Array;
+      return (x) => encoder.encode(x as string) as Uint8Array;
     }();
     const push = new Uint8Array(1);
     let remainder = 0;

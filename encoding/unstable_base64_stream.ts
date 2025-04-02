@@ -25,8 +25,6 @@
  * @module
  */
 
-import type { Uint8Array_ } from "./_types.ts";
-export type { Uint8Array_ };
 import {
   type Base64Format,
   calcMax,
@@ -35,7 +33,7 @@ import {
 } from "./unstable_base64.ts";
 import { detach } from "./_common_detach.ts";
 
-type Expect<T> = T extends "bytes" ? Uint8Array_ : string;
+type Expect<T> = T extends "bytes" ? Uint8Array : string;
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -66,8 +64,8 @@ const decoder = new TextDecoder();
  */
 export class Base64EncoderStream<T extends "string" | "bytes">
   extends TransformStream<
-    Uint8Array_,
-    T extends "bytes" ? Uint8Array_ : string
+    Uint8Array,
+    T extends "bytes" ? Uint8Array : string
   > {
   /**
    * Constructs a new instance.
@@ -75,7 +73,7 @@ export class Base64EncoderStream<T extends "string" | "bytes">
    * @param options The options for the base64 stream.
    */
   constructor(options: { format?: Base64Format; output?: T } = {}) {
-    const decode = function (): (input: Uint8Array_) => Expect<T> {
+    const decode = function (): (input: Uint8Array) => Expect<T> {
       if (options.output === "bytes") return (x) => x as Expect<T>;
       return (x) => decoder.decode(x) as Expect<T>;
     }();
@@ -141,8 +139,8 @@ export class Base64EncoderStream<T extends "string" | "bytes">
  */
 export class Base64DecoderStream<T extends "string" | "bytes">
   extends TransformStream<
-    T extends "bytes" ? Uint8Array_ : string,
-    Uint8Array_
+    T extends "bytes" ? Uint8Array : string,
+    Uint8Array
   > {
   /**
    * Constructs a new instance.
@@ -150,9 +148,9 @@ export class Base64DecoderStream<T extends "string" | "bytes">
    * @param options The options for the base64 stream.
    */
   constructor(options: { format?: Base64Format; input?: T } = {}) {
-    const encode = function (): (input: Expect<T>) => Uint8Array_ {
-      if (options.input === "bytes") return (x) => x as Uint8Array_;
-      return (x) => encoder.encode(x as string) as Uint8Array_;
+    const encode = function (): (input: Expect<T>) => Uint8Array {
+      if (options.input === "bytes") return (x) => x as Uint8Array;
+      return (x) => encoder.encode(x as string) as Uint8Array;
     }();
     const push = new Uint8Array(3);
     let remainder = 0;

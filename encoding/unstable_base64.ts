@@ -6,11 +6,11 @@
  *
  * ```ts
  * import { assertEquals } from "@std/assert";
- * import { encodeBase64, type Uint8Array_ } from "@std/encoding/unstable-base64";
+ * import { encodeBase64 } from "@std/encoding/unstable-base64";
  *
  * assertEquals(encodeBase64("Hello World", "Base64"), "SGVsbG8gV29ybGQ=");
  * assertEquals(
- *   encodeBase64(new TextEncoder().encode("Hello World") as Uint8Array_, "Base64"),
+ *   encodeBase64(new TextEncoder().encode("Hello World") as Uint8Array, "Base64"),
  *   "SGVsbG8gV29ybGQ=",
  * );
  * ```
@@ -21,8 +21,6 @@
  * @module
  */
 
-import type { Uint8Array_ } from "./_types.ts";
-export type { Uint8Array_ };
 import { calcMax, decode, encode } from "./_common64.ts";
 export { calcMax };
 import { detach } from "./_common_detach.ts";
@@ -64,33 +62,33 @@ export type Base64Format = "Base64" | "Base64Url";
  * @example Basic Usage
  * ```ts
  * import { assertEquals } from "@std/assert";
- * import { encodeBase64, type Uint8Array_ } from "@std/encoding/unstable-base64";
+ * import { encodeBase64 } from "@std/encoding/unstable-base64";
  *
  * assertEquals(encodeBase64("Hello World", "Base64"), "SGVsbG8gV29ybGQ=");
  * assertEquals(
- *   encodeBase64(new TextEncoder().encode("Hello World") as Uint8Array_, "Base64"),
+ *   encodeBase64(new TextEncoder().encode("Hello World") as Uint8Array, "Base64"),
  *   "SGVsbG8gV29ybGQ=",
  * );
  *
  * assertEquals(encodeBase64("Hello World", "Base64Url"), "SGVsbG8gV29ybGQ");
  * assertEquals(
- *   encodeBase64(new TextEncoder().encode("Hello World") as Uint8Array_, "Base64Url"),
+ *   encodeBase64(new TextEncoder().encode("Hello World") as Uint8Array, "Base64Url"),
  *   "SGVsbG8gV29ybGQ",
  * );
  * ```
  */
 export function encodeBase64(
-  input: string | Uint8Array_ | ArrayBuffer,
+  input: string | Uint8Array | ArrayBuffer,
   format: Base64Format = "Base64",
 ): string {
   if (typeof input === "string") {
-    input = new TextEncoder().encode(input) as Uint8Array_;
+    input = new TextEncoder().encode(input) as Uint8Array;
   } else if (input instanceof ArrayBuffer) {
     input = new Uint8Array(input);
   }
   let [output, i] = detach(
-    input as Uint8Array_,
-    calcMax((input as Uint8Array_).length),
+    input as Uint8Array,
+    calcMax((input as Uint8Array).length),
   );
   let o = encode(output, i, 0, alphabet[format], padding);
   if (format === "Base64Url") {
@@ -141,7 +139,7 @@ export function encodeBase64(
  * ```
  */
 export function encodeRawBase64(
-  buffer: Uint8Array_,
+  buffer: Uint8Array,
   i: number,
   o: number,
   format: Base64Format = "Base64",
@@ -185,11 +183,11 @@ export function encodeRawBase64(
  * ```
  */
 export function decodeBase64(
-  input: string | Uint8Array_,
+  input: string | Uint8Array,
   format: Base64Format = "Base64",
-): Uint8Array_ {
+): Uint8Array {
   if (typeof input === "string") {
-    input = new TextEncoder().encode(input) as Uint8Array_;
+    input = new TextEncoder().encode(input) as Uint8Array;
   }
   return input.subarray(0, decode(input, 0, 0, rAlphabet[format], padding));
 }
@@ -215,12 +213,11 @@ export function decodeBase64(
  * import {
  *   decodeRawBase64,
  *   encodeBase64,
- *   type Uint8Array_,
  * } from "@std/encoding/unstable-base64";
  *
  * let buffer = new TextEncoder().encode(
  *   "data:url/fake," + encodeBase64(await Deno.readFile("./deno.lock"), "Base64"),
- * ) as Uint8Array_;
+ * ) as Uint8Array;
  *
  * const i = buffer.indexOf(",".charCodeAt(0)) + 1;
  * const o = decodeRawBase64(buffer, i, i, "Base64");
@@ -230,7 +227,7 @@ export function decodeBase64(
  * ```
  */
 export function decodeRawBase64(
-  buffer: Uint8Array_,
+  buffer: Uint8Array,
   i: number,
   o: number,
   format: Base64Format = "Base64",

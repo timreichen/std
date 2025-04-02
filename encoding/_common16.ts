@@ -1,8 +1,5 @@
 // Copyright 2018-2025 the Deno authors. MIT license.
 
-import type { Uint8Array_ } from "./_types.ts";
-export type { Uint8Array_ };
-
 /**
  * Calculate the output size needed to encode a given input size for
  * {@linkcode encodeRawHex}.
@@ -23,7 +20,7 @@ export function calcMax(originalSize: number): number {
 }
 
 export function encode(
-  buffer: Uint8Array_,
+  buffer: Uint8Array,
   i: number,
   o: number,
   alphabet: Uint8Array,
@@ -37,7 +34,7 @@ export function encode(
 }
 
 export function decode(
-  buffer: Uint8Array_,
+  buffer: Uint8Array,
   i: number,
   o: number,
   alphabet: Uint8Array,

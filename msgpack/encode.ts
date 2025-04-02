@@ -2,8 +2,6 @@
 // This module is browser compatible.
 
 import { concat } from "@std/bytes/concat";
-import type { Uint8Array_ } from "./_types.ts";
-export type { Uint8Array_ };
 
 /**
  * Value types that can be encoded to MessagePack.
@@ -63,7 +61,7 @@ const encoder = new TextEncoder();
  * @param object Value to encode to MessagePack binary format.
  * @returns Encoded MessagePack binary data.
  */
-export function encode(object: ValueType): Uint8Array_ {
+export function encode(object: ValueType): Uint8Array {
   const byteParts: Uint8Array[] = [];
   encodeSlice(object, byteParts);
   return concat(byteParts);
