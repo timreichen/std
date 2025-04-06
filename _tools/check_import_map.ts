@@ -5,38 +5,43 @@ import denoJson from "../deno.json" with { type: "json" };
 import importMap from "../import_map.json" with { type: "json" };
 import { join } from "@std/path";
 
-// deno-lint-ignore no-explicit-any
-const imports = importMap.imports as any;
-const denoJsonList = Promise.all(
-  denoJson.workspace.map((w) =>
-    Deno.readTextFile(join(w, "deno.json")).then(JSON.parse)
-  ),
-);
+const FAIL_FAST = Deno.args.includes("--fail-fast");
+
+const imports = importMap.imports;
 
 let failed = false;
 
-for (const denoJson of await denoJsonList) {
-  const dependency = imports[denoJson.name];
+/**
+ * Checks whether import map has a correct entry for each workspace.
+ */
+for (const workspace of denoJson.workspace) {
+  const denoJsonFilePath = join(Deno.cwd(), workspace, "deno.json");
+
+  const { default: json } = await import(denoJsonFilePath, {
+    with: { type: "json" },
+  });
+
+  const name = json.name as keyof typeof imports;
+  const dependency = imports[name];
 
   if (!dependency) {
-    console.warn(`No import map entry found for ${denoJson.name}`);
+    console.warn(`No import map entry found for ${json.name}`);
+    if (FAIL_FAST) Deno.exit(1);
     failed = true;
     continue;
   }
-  const correctDependency = `jsr:${denoJson.name}@^${denoJson.version}`;
+
+  const correctDependency = `jsr:${json.name}@^${json.version}`;
   if (dependency !== correctDependency) {
-    console.warn(
-      `Invalid import map entry for ${denoJson.name}: ${dependency}`,
-    );
-    console.warn(
-      `Expected: ${correctDependency}`,
-    );
+    console.warn(`Invalid import map entry for ${json.name}: ${dependency}`);
+    console.warn(`Expected: ${correctDependency}`);
+    if (FAIL_FAST) Deno.exit(1);
     failed = true;
   }
 }
 
-if (failed) {
-  Deno.exit(1);
-}
+if (failed) Deno.exit(1);
 
-console.log("ok");
+console.log(
+  `Checked import map for ${denoJson.workspace.length} workspace entries`,
+);
