@@ -323,32 +323,23 @@ export class LoaderState {
     this.tagMap.set(handle, prefix);
   }
   captureSegment(start: number, end: number, checkJson: boolean) {
-    let result: string;
-    if (start < end) {
-      result = this.input.slice(start, end);
-
-      if (checkJson) {
-        for (
-          let position = 0;
-          position < result.length;
-          position++
-        ) {
-          const character = result.charCodeAt(position);
-          if (
-            !(character === 0x09 ||
-              (0x20 <= character && character <= 0x10ffff))
-          ) {
-            return this.throwError(
-              `Expected valid JSON character: received "${character}"`,
-            );
-          }
+    if (start >= end) return "";
+    const result = this.input.slice(start, end);
+    if (checkJson) {
+      for (let position = 0; position < result.length; position++) {
+        const ch = result.charCodeAt(position);
+        if (!(ch === 0x09 || (0x20 <= ch && ch <= 0x10ffff))) {
+          return this.throwError(
+            `Expected valid JSON character: received "${ch}"`,
+          );
         }
-      } else if (PATTERN_NON_PRINTABLE.test(result)) {
-        return this.throwError("Stream contains non-printable characters");
       }
-
-      this.result += result;
+      return result;
     }
+    if (PATTERN_NON_PRINTABLE.test(result)) {
+      return this.throwError("Stream contains non-printable characters");
+    }
+    return result;
   }
   readBlockSequence(nodeIndent: number): boolean {
     let line: number;
@@ -672,7 +663,7 @@ export class LoaderState {
       }
 
       if (hasPendingContent) {
-        this.captureSegment(captureStart, captureEnd, false);
+        this.result += this.captureSegment(captureStart, captureEnd, false);
         this.writeFoldedLines(this.line - line);
         captureStart = captureEnd = this.position;
         hasPendingContent = false;
@@ -685,7 +676,7 @@ export class LoaderState {
       ch = this.next();
     }
 
-    this.captureSegment(captureStart, captureEnd, false);
+    this.result += this.captureSegment(captureStart, captureEnd, false);
 
     if (this.result) {
       return true;
@@ -713,7 +704,7 @@ export class LoaderState {
 
     while ((ch = this.peek()) !== 0) {
       if (ch === SINGLE_QUOTE) {
-        this.captureSegment(captureStart, this.position, true);
+        this.result += this.captureSegment(captureStart, this.position, true);
         ch = this.next();
 
         if (ch === SINGLE_QUOTE) {
@@ -724,7 +715,7 @@ export class LoaderState {
           return true;
         }
       } else if (isEOL(ch)) {
-        this.captureSegment(captureStart, captureEnd, true);
+        this.result += this.captureSegment(captureStart, captureEnd, true);
         this.writeFoldedLines(this.skipSeparationSpace(false, nodeIndent));
         captureStart = captureEnd = this.position;
       } else if (
@@ -759,12 +750,12 @@ export class LoaderState {
     let tmp: number;
     while ((ch = this.peek()) !== 0) {
       if (ch === DOUBLE_QUOTE) {
-        this.captureSegment(captureStart, this.position, true);
+        this.result += this.captureSegment(captureStart, this.position, true);
         this.position++;
         return true;
       }
       if (ch === BACKSLASH) {
-        this.captureSegment(captureStart, this.position, true);
+        this.result += this.captureSegment(captureStart, this.position, true);
         ch = this.next();
 
         if (isEOL(ch)) {
@@ -799,7 +790,7 @@ export class LoaderState {
 
         captureStart = captureEnd = this.position;
       } else if (isEOL(ch)) {
-        this.captureSegment(captureStart, captureEnd, true);
+        this.result += this.captureSegment(captureStart, captureEnd, true);
         this.writeFoldedLines(this.skipSeparationSpace(false, nodeIndent));
         captureStart = captureEnd = this.position;
       } else if (
@@ -1088,7 +1079,7 @@ export class LoaderState {
         ch = this.next();
       }
 
-      this.captureSegment(captureStart, this.position, false);
+      this.result += this.captureSegment(captureStart, this.position, false);
     }
 
     return true;
