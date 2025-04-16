@@ -229,12 +229,26 @@ export class LoaderState {
     }
   }
 
+  eof() {
+    return this.peek() === "\x00";
+  }
   peek(offset = 0) {
     return this.input[this.position + offset] ?? "\x00";
   }
   next() {
     this.position += 1;
     return this.peek();
+  }
+  startsWith(searchString: string) {
+    return this.input.startsWith(searchString, this.position);
+  }
+  match(regExp: RegExp) {
+    regExp = new RegExp(
+      regExp.source,
+      regExp.sticky ? regExp.flags : regExp.flags + "y",
+    );
+    regExp.lastIndex = this.position;
+    return this.input.match(regExp);
   }
 
   #createError(message: string): SyntaxError {
@@ -354,7 +368,6 @@ export class LoaderState {
     let line: number;
     let following: string;
     let detected = false;
-    let ch: string;
     const tag = this.tag;
     const anchor = this.anchor;
     const result: unknown[] = [];
@@ -363,12 +376,9 @@ export class LoaderState {
       this.anchorMap.set(this.anchor, result);
     }
 
-    ch = this.peek();
-
-    while (ch !== "\x00") {
-      if (ch !== MINUS) {
-        break;
-      }
+    while (!this.eof()) {
+      const ch = this.peek();
+      if (ch !== MINUS) break;
 
       following = this.peek(1);
 
@@ -382,7 +392,6 @@ export class LoaderState {
       if (this.skipSeparationSpace(true, -1)) {
         if (this.lineIndent <= nodeIndent) {
           result.push(null);
-          ch = this.peek();
           continue;
         }
       }
@@ -392,11 +401,9 @@ export class LoaderState {
       result.push(this.result);
       this.skipSeparationSpace(true, -1);
 
-      ch = this.peek();
-
       if (
         (this.line === line || this.lineIndent > nodeIndent) &&
-        ch !== "\x00"
+        !this.eof()
       ) {
         return this.throwError(
           "Cannot read block sequence: bad indentation of a sequence entry",
@@ -512,19 +519,11 @@ export class LoaderState {
     return result;
   }
   readLineBreak() {
-    const ch = this.peek();
-
-    if (ch === LINE_FEED) {
-      this.position++;
-    } else if (ch === CARRIAGE_RETURN) {
-      this.position++;
-      if (this.peek() === LINE_FEED) {
-        this.position++;
-      }
-    } else {
+    const match = this.match(/\r?\n/);
+    if (!match) {
       return this.throwError("Cannot read line: line break not found");
     }
-
+    this.position += match[0].length;
     this.line += 1;
     this.lineStart = this.position;
   }
@@ -532,7 +531,7 @@ export class LoaderState {
     let lineBreaks = 0;
     let ch = this.peek();
 
-    while (ch !== "\x00") {
+    while (!this.eof()) {
       while (isWhiteSpace(ch)) {
         ch = this.next();
       }
@@ -541,7 +540,7 @@ export class LoaderState {
         do {
           ch = this.next();
         } while (
-          ch !== LINE_FEED && ch !== CARRIAGE_RETURN && ch !== "\x00"
+          ch !== LINE_FEED && ch !== CARRIAGE_RETURN && !this.eof()
         );
       }
 
@@ -570,18 +569,11 @@ export class LoaderState {
     return lineBreaks;
   }
   testDocumentSeparator(): boolean {
-    let ch = this.peek();
-
     // Condition this.position === this.lineStart is tested
     // in parent on each call, for efficiency. No needs to test here again.
-    if (
-      (ch === MINUS || ch === DOT) &&
-      ch === this.peek(1) &&
-      ch === this.peek(2)
-    ) {
-      ch = this.peek(3);
-
-      if (ch === "\x00" || isWhiteSpaceOrEOL(ch)) {
+    if (this.startsWith("---") || this.startsWith("...")) {
+      const ch = this.peek(3);
+      if (this.eof() || isWhiteSpaceOrEOL(ch)) {
         return true;
       }
     }
@@ -636,7 +628,7 @@ export class LoaderState {
     let captureStart = this.position;
     let hasPendingContent = false;
     let line = 0;
-    while (ch !== "\x00") {
+    while (!this.eof()) {
       if (ch === COLON) {
         following = this.peek(1);
 
@@ -859,7 +851,7 @@ export class LoaderState {
     let following = "";
     let line = 0;
     const overridableKeys = new Set<string>();
-    while (ch !== "\x00") {
+    while (!this.eof()) {
       this.skipSeparationSpace(true, nodeIndent);
 
       ch = this.peek();
@@ -970,7 +962,7 @@ export class LoaderState {
     this.result = "";
 
     let tmp = 0;
-    while (ch !== "\x00") {
+    while (!this.eof()) {
       ch = this.next();
 
       if (ch === PLUS || ch === MINUS) {
@@ -1007,11 +999,11 @@ export class LoaderState {
       if (ch === SHARP) {
         do {
           ch = this.next();
-        } while (!isEOL(ch) && ch !== "\x00");
+        } while (!isEOL(ch) && !this.eof());
       }
     }
 
-    while (ch !== "\x00") {
+    while (!this.eof()) {
       this.readLineBreak();
       this.lineIndent = 0;
 
@@ -1092,7 +1084,7 @@ export class LoaderState {
       emptyLines = 0;
       const captureStart = this.position;
 
-      while (!isEOL(ch) && ch !== "\x00") {
+      while (!isEOL(ch) && !this.eof()) {
         ch = this.next();
       }
 
@@ -1123,7 +1115,7 @@ export class LoaderState {
 
     ch = this.peek();
 
-    while (ch !== "\x00") {
+    while (!this.eof()) {
       following = this.peek(1);
       line = this.line; // Save the current line.
       pos = this.position;
@@ -1250,7 +1242,7 @@ export class LoaderState {
         ch = this.peek();
       }
 
-      if (this.lineIndent > nodeIndent && ch !== "\x00") {
+      if (this.lineIndent > nodeIndent && !this.eof()) {
         return this.throwError(
           "Cannot read block: bad indentation of a mapping entry",
         );
@@ -1320,7 +1312,7 @@ export class LoaderState {
     if (isVerbatim) {
       do {
         ch = this.next();
-      } while (ch !== "\x00" && ch !== GREATER_THAN);
+      } while (!this.eof() && ch !== GREATER_THAN);
 
       if (this.position < this.length) {
         tagName = this.input.slice(position, this.position);
@@ -1331,7 +1323,7 @@ export class LoaderState {
         );
       }
     } else {
-      while (ch !== "\x00" && !isWhiteSpaceOrEOL(ch)) {
+      while (!this.eof() && !isWhiteSpaceOrEOL(ch)) {
         if (ch === EXCLAMATION) {
           if (!isNamed) {
             tagHandle = this.input.slice(position - 1, this.position + 1);
@@ -1397,9 +1389,7 @@ export class LoaderState {
     ch = this.next();
 
     const position = this.position;
-    while (
-      ch !== "\x00" && !isWhiteSpaceOrEOL(ch) && !isFlowIndicator(ch)
-    ) {
+    while (!this.eof() && !isWhiteSpaceOrEOL(ch) && !isFlowIndicator(ch)) {
       ch = this.next();
     }
 
@@ -1414,14 +1404,11 @@ export class LoaderState {
   }
   readAlias(): boolean {
     if (this.peek() !== ASTERISK) return false;
-
     let ch = this.next();
 
     const position = this.position;
 
-    while (
-      ch !== "\x00" && !isWhiteSpaceOrEOL(ch) && !isFlowIndicator(ch)
-    ) {
+    while (!this.eof() && !isWhiteSpaceOrEOL(ch) && !isFlowIndicator(ch)) {
       ch = this.next();
     }
 
@@ -1634,7 +1621,7 @@ export class LoaderState {
       ch = this.next();
       position = this.position;
 
-      while (ch !== "\x00" && !isWhiteSpaceOrEOL(ch)) {
+      while (!this.eof() && !isWhiteSpaceOrEOL(ch)) {
         ch = this.next();
       }
 
@@ -1647,7 +1634,7 @@ export class LoaderState {
         );
       }
 
-      while (ch !== "\x00") {
+      while (!this.eof()) {
         while (isWhiteSpace(ch)) {
           ch = this.next();
         }
@@ -1655,7 +1642,7 @@ export class LoaderState {
         if (ch === SHARP) {
           do {
             ch = this.next();
-          } while (ch !== "\x00" && !isEOL(ch));
+          } while (!this.eof() && !isEOL(ch));
           break;
         }
 
@@ -1663,14 +1650,14 @@ export class LoaderState {
 
         position = this.position;
 
-        while (ch !== "\x00" && !isWhiteSpaceOrEOL(ch)) {
+        while (!this.eof() && !isWhiteSpaceOrEOL(ch)) {
           ch = this.next();
         }
 
         directiveArgs.push(this.input.slice(position, this.position));
       }
 
-      if (ch !== "\x00") this.readLineBreak();
+      if (!this.eof()) this.readLineBreak();
 
       switch (directiveName) {
         case "YAML":
@@ -1689,12 +1676,7 @@ export class LoaderState {
 
     this.skipSeparationSpace(true, -1);
 
-    if (
-      this.lineIndent === 0 &&
-      this.peek() === MINUS &&
-      this.peek(1) === MINUS &&
-      this.peek(2) === MINUS
-    ) {
+    if (this.lineIndent === 0 && this.startsWith("---")) {
       this.position += 3;
       this.skipSeparationSpace(true, -1);
     } else if (hasDirectives) {
