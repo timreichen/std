@@ -225,9 +225,14 @@ export class LoaderState {
     let ch = this.peek();
     if (ch !== SHARP) return;
     ch = this.next();
-    while (ch !== 0 && !isEOL(ch)) {
+    while (!this.eof() && !isEOL(ch)) {
       ch = this.next();
     }
+  }
+
+  eof() {
+    const ch = this.peek();
+    return ch === 0;
   }
 
   readIndent() {
@@ -370,7 +375,7 @@ export class LoaderState {
 
     ch = this.peek();
 
-    while (ch !== 0) {
+    while (!this.eof()) {
       if (ch !== MINUS) {
         break;
       }
@@ -399,7 +404,7 @@ export class LoaderState {
 
       ch = this.peek();
 
-      if ((this.line === line || this.lineIndent > nodeIndent) && ch !== 0) {
+      if ((this.line === line || this.lineIndent > nodeIndent) && !this.eof()) {
         throw this.#createError(
           "Cannot read block sequence: bad indentation of a sequence entry",
         );
@@ -534,7 +539,7 @@ export class LoaderState {
     let lineBreaks = 0;
     let ch = this.peek();
 
-    while (ch !== 0) {
+    while (!this.eof()) {
       while (isWhiteSpace(ch)) {
         ch = this.next();
       }
@@ -580,7 +585,7 @@ export class LoaderState {
     ) {
       ch = this.peek(3);
 
-      if (ch === 0 || isWhiteSpaceOrEOL(ch)) {
+      if (this.eof() || isWhiteSpaceOrEOL(ch)) {
         return true;
       }
     }
@@ -635,7 +640,7 @@ export class LoaderState {
     let captureStart = this.position;
     let hasPendingContent = false;
     let line = 0;
-    while (ch !== 0) {
+    while (!this.eof()) {
       if (ch === COLON) {
         following = this.peek(1);
 
@@ -855,7 +860,7 @@ export class LoaderState {
     let following = 0;
     let line = 0;
     const overridableKeys = new Set<string>();
-    while (ch !== 0) {
+    while (!this.eof()) {
       this.skipSeparationSpace(true, nodeIndent);
 
       ch = this.peek();
@@ -966,7 +971,7 @@ export class LoaderState {
     this.result = "";
 
     let tmp = 0;
-    while (ch !== 0) {
+    while (!this.eof()) {
       ch = this.next();
 
       if (ch === PLUS || ch === MINUS) {
@@ -1001,10 +1006,9 @@ export class LoaderState {
       } while (isWhiteSpace(ch));
 
       this.skipComment();
-      ch = this.peek();
     }
 
-    while (ch !== 0) {
+    while (!this.eof()) {
       this.readLineBreak();
       this.lineIndent = 0;
 
@@ -1085,7 +1089,7 @@ export class LoaderState {
       emptyLines = 0;
       const captureStart = this.position;
 
-      while (!isEOL(ch) && ch !== 0) {
+      while (!isEOL(ch) && !this.eof()) {
         ch = this.next();
       }
 
@@ -1116,7 +1120,7 @@ export class LoaderState {
 
     ch = this.peek();
 
-    while (ch !== 0) {
+    while (!this.eof()) {
       following = this.peek(1);
       line = this.line; // Save the current line.
       pos = this.position;
@@ -1243,7 +1247,7 @@ export class LoaderState {
         ch = this.peek();
       }
 
-      if (this.lineIndent > nodeIndent && ch !== 0) {
+      if (this.lineIndent > nodeIndent && !this.eof()) {
         throw this.#createError(
           "Cannot read block: bad indentation of a mapping entry",
         );
@@ -1313,7 +1317,7 @@ export class LoaderState {
     if (isVerbatim) {
       do {
         ch = this.next();
-      } while (ch !== 0 && ch !== GREATER_THAN);
+      } while (!this.eof() && ch !== GREATER_THAN);
 
       if (this.position < this.length) {
         tagName = this.input.slice(position, this.position);
@@ -1324,7 +1328,7 @@ export class LoaderState {
         );
       }
     } else {
-      while (ch !== 0 && !isWhiteSpaceOrEOL(ch)) {
+      while (!this.eof() && !isWhiteSpaceOrEOL(ch)) {
         if (ch === EXCLAMATION) {
           if (!isNamed) {
             tagHandle = this.input.slice(position - 1, this.position + 1);
@@ -1390,7 +1394,7 @@ export class LoaderState {
     ch = this.next();
 
     const position = this.position;
-    while (ch !== 0 && !isWhiteSpaceOrEOL(ch) && !isFlowIndicator(ch)) {
+    while (!this.eof() && !isWhiteSpaceOrEOL(ch) && !isFlowIndicator(ch)) {
       ch = this.next();
     }
 
@@ -1410,7 +1414,7 @@ export class LoaderState {
 
     const position = this.position;
 
-    while (ch !== 0 && !isWhiteSpaceOrEOL(ch) && !isFlowIndicator(ch)) {
+    while (!this.eof() && !isWhiteSpaceOrEOL(ch) && !isFlowIndicator(ch)) {
       ch = this.next();
     }
 
@@ -1623,7 +1627,7 @@ export class LoaderState {
       ch = this.next();
       position = this.position;
 
-      while (ch !== 0 && !isWhiteSpaceOrEOL(ch)) {
+      while (!this.eof() && !isWhiteSpaceOrEOL(ch)) {
         ch = this.next();
       }
 
@@ -1636,7 +1640,7 @@ export class LoaderState {
         );
       }
 
-      while (ch !== 0) {
+      while (!this.eof()) {
         while (isWhiteSpace(ch)) {
           ch = this.next();
         }
@@ -1648,14 +1652,14 @@ export class LoaderState {
 
         position = this.position;
 
-        while (ch !== 0 && !isWhiteSpaceOrEOL(ch)) {
+        while (!this.eof() && !isWhiteSpaceOrEOL(ch)) {
           ch = this.next();
         }
 
         directiveArgs.push(this.input.slice(position, this.position));
       }
 
-      if (ch !== 0) this.readLineBreak();
+      if (!this.eof()) this.readLineBreak();
 
       switch (directiveName) {
         case "YAML":
