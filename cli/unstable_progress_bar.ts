@@ -187,18 +187,21 @@ export class ProgressBar {
    */
   max: number;
 
-  #writer: WritableStreamDefaultWriter;
-  #id: number;
-  #startTime: number;
-  #previousTime: number;
-  #previousValue: number;
+  #writable: WritableStream<Uint8Array<ArrayBufferLike>>;
   #barLength: number;
   #fillChar: string;
   #emptyChar: string;
   #clear: boolean;
   #fmt: (fmt: ProgressBarFormatter) => string;
   #keepOpen: boolean;
-  #pipePromise: Promise<void>;
+
+  #intervalId: number | null = null;
+  #startTime!: number;
+  #previousTime!: number;
+  #previousValue!: number;
+  #writer!: WritableStreamDefaultWriter;
+  #pipePromise!: Promise<void>;
+
   /**
    * Constructs a new instance.
    *
@@ -218,6 +221,8 @@ export class ProgressBar {
       fmt = defaultFormatter,
       keepOpen = true,
     } = options;
+
+    this.#writable = writable;
     this.value = value;
     this.max = max;
     this.#barLength = barLength;
@@ -227,18 +232,28 @@ export class ProgressBar {
     this.#fmt = fmt;
     this.#keepOpen = keepOpen;
 
+    this.#start();
+  }
+
+  async #start() {
+    if (this.#intervalId !== null || this.#writable.locked) return;
+
     const stream = new TextEncoderStream();
     this.#pipePromise = stream.readable
-      .pipeTo(writable, { preventClose: this.#keepOpen })
-      .catch(() => clearInterval(this.#id));
+      .pipeTo(this.#writable, { preventClose: this.#keepOpen })
+      .catch(() => {
+        if (this.#intervalId) clearInterval(this.#intervalId);
+      });
     this.#writer = stream.writable.getWriter();
+
     this.#startTime = Date.now();
     this.#previousTime = 0;
     this.#previousValue = this.value;
 
-    this.#id = setInterval(() => this.#print(), 1000);
-    this.#print();
+    this.#intervalId = setInterval(() => this.#print(), 1000);
+    await this.#print();
   }
+
   #createFormatterObject() {
     const time = Date.now() - this.#startTime;
 
@@ -288,7 +303,8 @@ export class ProgressBar {
    * ```
    */
   async stop(): Promise<void> {
-    clearInterval(this.#id);
+    if (this.#intervalId === null) return;
+    clearInterval(this.#intervalId);
     try {
       if (this.#clear) {
         await this.#writer.write(LINE_CLEAR);
