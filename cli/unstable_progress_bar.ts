@@ -207,9 +207,7 @@ export class ProgressBar {
    *
    * @param options The options to configure various settings of the progress bar.
    */
-  constructor(
-    options: ProgressBarOptions,
-  ) {
+  constructor(options: ProgressBarOptions) {
     const {
       writable = Deno.stderr.writable,
       value = 0,
@@ -242,7 +240,7 @@ export class ProgressBar {
     this.#pipePromise = stream.readable
       .pipeTo(this.#writable, { preventClose: this.#keepOpen })
       .catch(() => {
-        if (this.#intervalId) clearInterval(this.#intervalId);
+        if (this.#intervalId !== null) clearInterval(this.#intervalId);
       });
     this.#writer = stream.writable.getWriter();
 
