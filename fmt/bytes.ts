@@ -49,6 +49,12 @@ export interface FormatOptions {
    */
   locale?: boolean | string | string[];
   /**
+   * The style how the unit should be displayed. See {@link https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl/NumberFormat/NumberFormat#unitdisplay}.
+   *
+   * @default {"short"}
+   */
+  unitDisplay?: "short" | "long" | "narrow";
+  /**
    * The minimum number of fraction digits to display. If neither
    * {@linkcode minimumFractionDigits} or {@linkcode maximumFractionDigits}
    * are set.
@@ -74,6 +80,7 @@ interface Unit {
 
 const BINARY_BYTE_UNITS: Unit[] = [
   { long: "byte", short: "B", magnitude: 1 },
+  // The current implementation deviates from the IEC standard. `altShort` exists to avoid breaking changes.
   { long: "kibibyte", short: "KiB", altShort: "kiB", magnitude: 2 ** 10 },
   { long: "mebibyte", short: "MiB", magnitude: 2 ** 20 },
   { long: "gibibyte", short: "GiB", magnitude: 2 ** 30 },
@@ -86,6 +93,7 @@ const BINARY_BYTE_UNITS: Unit[] = [
 
 const BINARY_BIT_UNITS: Unit[] = [
   { long: "bit", short: "b", magnitude: 1 },
+  // The current implementation deviates from the IEC standard. `altShort` exists to avoid breaking changes.
   { long: "kibibit", short: "Kib", altShort: "kibit", magnitude: 2 ** 10 },
   { long: "mebibit", short: "Mib", altShort: "Mibit", magnitude: 2 ** 20 },
   { long: "gibibit", short: "Gib", altShort: "Gibit", magnitude: 2 ** 30 },
@@ -110,6 +118,7 @@ const DECIMAL_BYTE_UNITS: Unit[] = [
 
 const DECIMAL_BIT_UNITS: Unit[] = [
   { long: "bit", short: "b", magnitude: 1 },
+  // The current implementation deviates from the IEC standard. `altShort` exists to avoid breaking changes.
   { long: "kilobit", short: "kb", altShort: "kbit", magnitude: 10 ** 3 },
   { long: "megabit", short: "Mb", altShort: "Mbit", magnitude: 10 ** 6 },
   { long: "gigabit", short: "Gb", altShort: "Gbit", magnitude: 10 ** 9 },
@@ -119,6 +128,7 @@ const DECIMAL_BIT_UNITS: Unit[] = [
   { long: "zettabit", short: "Zb", altShort: "Zbit", magnitude: 10 ** 21 },
   { long: "yottabit", short: "Yb", altShort: "Ybit", magnitude: 10 ** 24 },
 ];
+
 /**
  * Iterates through the `units` map and selects the unit whose `magnitude` is the largest
  * without exceeding the provided `value`.
@@ -189,7 +199,13 @@ export function format(
     throw new TypeError(`Expected a finite number, got ${typeof num}: ${num}`);
   }
 
-  const { bits = false, binary = false, signed = false, locale } = options;
+  const {
+    bits = false,
+    binary = false,
+    signed = false,
+    locale,
+    unitDisplay = "short",
+  } = options;
 
   let prefix = "";
   if (num < 0) {
@@ -216,8 +232,20 @@ export function format(
 
   const numberString = toLocaleString(num, locale, formatOptions);
 
-  const name = unit.altShort ?? unit.short;
-  return `${prefix}${numberString} ${name}`;
+  let suffix: string;
+  switch (unitDisplay) {
+    case "long":
+      suffix = ` ${unit.long}${num === 1 ? "" : "s"}`;
+      break;
+    case "narrow":
+      suffix = `${unit.altShort ?? unit.short}`;
+      break;
+    case "short":
+      suffix = ` ${unit.altShort ?? unit.short}`;
+      break;
+  }
+
+  return `${prefix}${numberString}${suffix}`;
 }
 
 type NumberFormatOptions = {
