@@ -1,3 +1,185 @@
+### 2025.10.07a
+
+#### @std/internal 1.0.12 (patch)
+
+- fix(internal): fix error in module reference (#6845)
+
+### 2025.10.07
+
+#### @std/assert 1.0.15 (patch)
+
+- feat(assert/unstable): truncate big diffs (#6835)
+- fix(assert): add support for checking ArrayBuffer equality (#6821)
+
+#### @std/async 1.0.15 (patch)
+
+- feat(async/unstable): add `ensureLastCall` option for `throttle` (#6800)
+- fix(async/unstable): fix handling of async predicate in waitFor (#6839)
+- fix(async): convert setTimeout return values to Number (fixing type error when
+  used with Node.js) (#6833)
+- fix(async): pass numeric value of `delay` timer to `unrefTimer` when
+  `persistent=false` (#6822)
+
+#### @std/cli 1.0.23 (patch)
+
+- fix(cli): improve Node compatibility by removing top-level Deno API usage
+  (#6837)
+- fix(cli): ensure unknown() is not called for collect args (parseArgs) (#6813)
+
+#### @std/html 1.0.5 (patch)
+
+- feat(html/unstable): add escapeJs and escapeCss functions (#6782)
+
+#### @std/http 1.0.21 (patch)
+
+- fix(http,random,streams,tar,webgpu): update types for Deno 2.5 (#6817)
+
+#### @std/internal 1.0.11 (patch)
+
+- chore(internal): support truncating of big diffs (#6835)
+
+#### @std/random 0.1.3 (patch)
+
+- fix(http,random,streams,tar,webgpu): update types for Deno 2.5 (#6817)
+
+#### @std/semver 1.0.6 (patch)
+
+- fix(semver): allow users to set prerelease number during increment (#6825)
+
+#### @std/streams 1.0.13 (patch)
+
+- fix(http,random,streams,tar,webgpu): update types for Deno 2.5 (#6817)
+
+#### @std/tar 0.1.9 (patch)
+
+- fix(http,random,streams,tar,webgpu): update types for Deno 2.5 (#6817)
+
+#### @std/testing 1.0.16 (patch)
+
+- feat(testing/unstable): add `it.todo` `test.todo` and `describe.todo` API
+  (#6712)
+
+#### @std/toml 1.0.11 (patch)
+
+- test(toml): test with the official toml-test suite (#6798)
+
+#### @std/webgpu 0.224.9 (patch)
+
+- fix(http,random,streams,tar,webgpu): update types for Deno 2.5 (#6817)
+
+#### @std/yaml 1.0.10 (patch)
+
+- feat(yaml/unstable): allow to add custom types for parse and stringify (#6841)
+
+### 2025.09.04
+
+#### @std/cli 1.0.22 (patch)
+
+- fix(cli/unstable): update typing of ProgressBarStream for TS 5.9 (#6811)
+
+#### @std/net 1.0.6 (patch)
+
+- feat(net/unstable): add matchSubnets on @std/net (#6786)
+
+#### @std/streams 1.0.12 (patch)
+
+- deprecation(streams/unstable): AbortStream (#6799)
+
+#### @std/tar 0.1.8 (patch)
+
+- refactor(tar): clean up TarStream (#6783)
+- test(tar): improve TarStream's tests (#6793)
+
+#### @std/toml 1.0.10 (patch)
+
+- fix(toml): nested table arrays (#6794)
+
+### 2025.08.13
+
+#### @std/assert 1.0.14 (patch)
+
+- chore(assert,expect): bump assert and expect versions (#6791)
+
+#### @std/collections 1.1.3 (patch)
+
+- test(collections): fix mapValues mutation test so it actually tests mutation
+  (#6780)
+
+#### @std/expect 1.0.17 (patch)
+
+- chore(assert,expect): bump assert and expect versions (#6791)
+
+#### @std/net 1.0.5 (patch)
+
+- feat(net/unstable): add ip utilities (#6765)
+
+#### @std/path 1.1.2 (patch)
+
+- fix(path): improve regex in `isGlob` (#6764)
+
+#### @std/streams 1.0.11 (patch)
+
+- refactor(streams/unstable): toByteStream to make use of autoAllocateChunkSize
+  (#6781)
+
+#### @std/text 1.0.16 (patch)
+
+- feat(text/unstable): add `trimBy` functions (#6778)
+
+#### @std/toml 1.0.9 (patch)
+
+- fix(toml): prevent prototype pollution by table key
+
+### 2025.07.29
+
+#### @std/async 1.0.14 (patch)
+
+- fix(async): allow delay timeout of arbitrary length (#6775)
+
+#### @std/tar 0.1.7 (patch)
+
+- fix(tar): receiving empty buffers (#6777)
+
+### 2025.07.22
+
+#### @std/cli 1.0.21 (patch)
+
+- BREAKING(cli/unstable): rename `fmt` of `ProgressBarOption` to `formatter`
+  (#6707)
+- feat(cli/unstable): introduce Ansi module (#6756)
+- feat(cli/unstable): add search to promptSelect and promptMultipleSelect
+  (#6741)
+- feat(cli/unstable): valued prompt items (#6742)
+- feat(cli/unstable): add `visibleLines` and `indicator` options to
+  `promptMultipleSelect`, and show `...` above the options when appropriate
+  (#6699)
+- refactor(cli/unstable): dedupe logic between promptSelect and
+  promptMultipleSelect (#6769)
+- refactor(cli/unstable): rename `title` to `label` for valued prompt items
+  (#6751)
+
+#### @std/data-structures 1.0.9 (patch)
+
+- feat(data-structures/unstable): 2d array (#6754)
+
+#### @std/http 1.0.20 (patch)
+
+- fix(http): respect colors and other `Deno.inspect` options when logging
+  `UserAgent`s (#6763)
+
+#### @std/internal 1.0.10 (patch)
+
+- fix(internal): fix inspect fallbacks for formatting diffs (#6747)
+
+#### @std/testing 1.0.15 (patch)
+
+- feat(testing/unstable): add `stubProperty` function (#6761)
+- fix(testing): align types for fake timeout/interval signatures (#6767)
+
+#### @std/yaml 1.0.9 (patch)
+
+- refactor(yaml): remove `version` property, separate directive handling (#6657)
+
 ### 2025.07.01
 
 #### @std/collections 1.1.2 (patch)
