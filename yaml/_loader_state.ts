@@ -181,7 +181,7 @@ function markToString(
   return where;
 }
 
-interface Node {
+interface State {
   data: unknown[] | Record<string, unknown> | string | null;
   tag: string | null | undefined;
   anchor: string | null | undefined;
@@ -361,10 +361,10 @@ export class LoaderState {
     }
     return data;
   }
-  readBlockSequence(node: Node, nodeIndent: number): Node | void {
+  readBlockSequence(state: State, nodeIndent: number): State | void {
     let detected = false;
 
-    const { tag, anchor } = node;
+    const { tag, anchor } = state;
 
     const data: unknown[] = [];
 
@@ -397,14 +397,13 @@ export class LoaderState {
       }
 
       const line = this.line;
-      const composedNode = this.composeNode({
+      const newState = this.composeNode({
         parentIndent: nodeIndent,
         nodeContext: CONTEXT_BLOCK_IN,
         allowToSeek: false,
         allowCompact: true,
       });
-      if (!composedNode) throw new Error(`Unexpected empty composed node`);
-      data.push(composedNode.data);
+      data.push(newState!.data);
       this.skipSeparationSpace(true, -1);
 
       ch = this.peek();
@@ -444,7 +443,7 @@ export class LoaderState {
     }
   }
   storeMappingPair(
-    result: Record<string, unknown>,
+    data: Record<string, unknown>,
     overridableKeys: Set<string>,
     keyTag: string | null,
     keyNode: Record<PropertyKey, unknown> | unknown[] | string | null,
@@ -487,11 +486,11 @@ export class LoaderState {
           index < valueNode.length;
           index++
         ) {
-          this.mergeMappings(result, valueNode[index], overridableKeys);
+          this.mergeMappings(data, valueNode[index], overridableKeys);
         }
       } else {
         this.mergeMappings(
-          result,
+          data,
           valueNode as Record<string, unknown>,
           overridableKeys,
         );
@@ -500,13 +499,13 @@ export class LoaderState {
       if (
         !this.allowDuplicateKeys &&
         !overridableKeys.has(keyNode) &&
-        Object.hasOwn(result, keyNode)
+        Object.hasOwn(data, keyNode)
       ) {
         this.line = startLine || this.line;
         this.position = startPos || this.position;
         throw this.#createError("Cannot store mapping pair: duplicated key");
       }
-      Object.defineProperty(result, keyNode, {
+      Object.defineProperty(data, keyNode, {
         value: valueNode,
         writable: true,
         enumerable: true,
@@ -515,7 +514,7 @@ export class LoaderState {
       overridableKeys.delete(keyNode);
     }
 
-    return result;
+    return data;
   }
   readLineBreak() {
     const ch = this.peek();
@@ -602,10 +601,10 @@ export class LoaderState {
     return data;
   }
   readPlainScalar(
-    result: Node,
+    state: State,
     nodeIndent: number,
     withinFlowCollection: boolean,
-  ): Node | void {
+  ): State | void {
     let ch = this.peek();
 
     if (
@@ -685,14 +684,14 @@ export class LoaderState {
       }
 
       if (hasPendingContent) {
-        result.data = this.captureSegment(
-          result.data,
+        data = this.captureSegment(
+          data,
           captureStart,
           captureEnd,
           false,
         );
-        result.data = this.writeFoldedLines(
-          result.data,
+        data = this.writeFoldedLines(
+          data,
           this.line - line,
         );
         captureStart = captureEnd = this.position;
@@ -708,12 +707,9 @@ export class LoaderState {
 
     data = this.captureSegment(data, captureStart, captureEnd, false);
 
-    if (data) return { ...result, kind: "scalar", data };
+    if (data) return { ...state, kind: "scalar", data };
   }
-  readSingleQuotedScalar(
-    result: Node,
-    nodeIndent: number,
-  ): Node | undefined {
+  readSingleQuotedScalar(state: State, nodeIndent: number): State | undefined {
     let ch = this.peek();
 
     if (ch !== SINGLE_QUOTE) {
@@ -742,7 +738,7 @@ export class LoaderState {
           this.position++;
           captureEnd = this.position;
         } else {
-          return { ...result, kind: "scalar", data };
+          return { ...state, kind: "scalar", data };
         }
       } else if (isEOL(ch)) {
         data = this.captureSegment(
@@ -774,10 +770,7 @@ export class LoaderState {
       "Unexpected end of the stream within a single quoted scalar",
     );
   }
-  readDoubleQuotedScalar(
-    result: Node,
-    nodeIndent: number,
-  ): Node | undefined {
+  readDoubleQuotedScalar(state: State, nodeIndent: number): State | undefined {
     let ch = this.peek();
 
     if (ch !== DOUBLE_QUOTE) {
@@ -800,7 +793,7 @@ export class LoaderState {
           true,
         );
         this.position++;
-        return { ...result, kind: "scalar", data };
+        return { ...state, kind: "scalar", data };
       }
       if (ch === BACKSLASH) {
         data = this.captureSegment(
@@ -872,7 +865,7 @@ export class LoaderState {
       "Unexpected end of the stream within a double quoted scalar",
     );
   }
-  readFlowCollection(node: Node, nodeIndent: number): Node | undefined {
+  readFlowCollection(state: State, nodeIndent: number): State | undefined {
     let ch = this.peek();
     let terminator: number;
     let isMapping = true;
@@ -887,7 +880,7 @@ export class LoaderState {
       return;
     }
 
-    const { tag, anchor } = node;
+    const { tag, anchor } = state;
 
     if (anchor !== null && typeof anchor !== "undefined") {
       this.anchorMap.set(anchor, data);
@@ -934,15 +927,15 @@ export class LoaderState {
       }
 
       line = this.line;
-      const composedNode = this.composeNode({
+      const newState = this.composeNode({
         parentIndent: nodeIndent,
         nodeContext: CONTEXT_FLOW_IN,
         allowToSeek: false,
         allowCompact: true,
       });
-      if (composedNode) node = composedNode;
-      keyTag = node.tag || null;
-      keyNode = node.data;
+      if (newState) state = newState;
+      keyTag = state.tag || null;
+      keyNode = state.data;
       this.skipSeparationSpace(true, nodeIndent);
 
       ch = this.peek();
@@ -951,14 +944,14 @@ export class LoaderState {
         isPair = true;
         ch = this.next();
         this.skipSeparationSpace(true, nodeIndent);
-        const composedNode = this.composeNode({
+        const newState = this.composeNode({
           parentIndent: nodeIndent,
           nodeContext: CONTEXT_FLOW_IN,
           allowToSeek: false,
           allowCompact: true,
         });
-        if (composedNode) node = composedNode;
-        valueNode = node.data;
+        if (newState) state = newState;
+        valueNode = state.data;
       }
 
       if (isMapping) {
@@ -1001,7 +994,7 @@ export class LoaderState {
   }
   // Handles block scaler styles: e.g. '|', '>', '|-' and '>-'.
   // https://yaml.org/spec/1.2.2/#81-block-scalar-styles
-  readBlockScalar(node: Node, nodeIndent: number): Node | undefined {
+  readBlockScalar(state: State, nodeIndent: number): State | undefined {
     let chomping = CHOMPING_CLIP;
     let didReadContent = false;
     let detectedIndent = false;
@@ -1145,14 +1138,14 @@ export class LoaderState {
 
       data = this.captureSegment(data, captureStart, this.position, false);
     }
-    return { ...node, kind: "scalar", data };
+    return { ...state, kind: "scalar", data };
   }
   readBlockMapping(
-    node: Node,
+    state: State,
     nodeIndent: number,
     flowIndent: number,
-  ): Node | undefined {
-    const { tag, anchor } = node;
+  ): State | undefined {
+    const { tag, anchor } = state;
 
     const data = {};
     const overridableKeys = new Set<string>();
@@ -1216,13 +1209,13 @@ export class LoaderState {
         // Implicit notation case. Flow-style node as the key first, then ":", and the value.
         //
       } else {
-        const composedNode = this.composeNode({
+        const newState = this.composeNode({
           parentIndent: flowIndent,
           nodeContext: CONTEXT_FLOW_OUT,
           allowToSeek: false,
           allowCompact: true,
         });
-        if (composedNode) {
+        if (newState) {
           if (this.line === line) {
             ch = this.peek();
 
@@ -1254,21 +1247,21 @@ export class LoaderState {
               detected = true;
               atExplicitKey = false;
               allowCompact = false;
-              keyTag = composedNode.tag;
-              keyNode = composedNode.data;
+              keyTag = newState.tag;
+              keyNode = newState.data;
             } else if (detected) {
               throw this.#createError(
                 "Cannot read an implicit mapping pair: missing colon",
               );
             } else {
-              return { ...composedNode, tag, anchor };
+              return { ...newState, tag, anchor };
             }
           } else if (detected) {
             throw this.#createError(
               "Cannot read a block mapping entry: a multiline key may not be an implicit key",
             );
           } else {
-            return { ...composedNode, tag, anchor };
+            return { ...newState, tag, anchor };
           }
         } else {
           break; // Reading is done. Go to the epilogue.
@@ -1279,17 +1272,17 @@ export class LoaderState {
       // Common reading code for both explicit and implicit notations.
       //
       if (this.line === line || this.lineIndent > nodeIndent) {
-        const composedNode = this.composeNode({
+        const newState = this.composeNode({
           parentIndent: nodeIndent,
           nodeContext: CONTEXT_BLOCK_OUT,
           allowToSeek: true,
           allowCompact,
         });
-        if (composedNode) {
+        if (newState) {
           if (atExplicitKey) {
-            keyNode = composedNode.data;
+            keyNode = newState.data;
           } else {
-            valueNode = composedNode.data;
+            valueNode = newState.data;
           }
         }
 
@@ -1461,8 +1454,8 @@ export class LoaderState {
 
     return this.input.slice(position, this.position);
   }
-  readAlias(result: Node) {
-    if (this.peek() !== ASTERISK) return false;
+  readAlias() {
+    if (this.peek() !== ASTERISK) return;
 
     let ch = this.next();
 
@@ -1486,8 +1479,7 @@ export class LoaderState {
     }
 
     this.skipSeparationSpace(true, -1);
-    const data = this.anchorMap.get(alias);
-    return { ...result, data };
+    return this.anchorMap.get(alias);
   }
 
   composeNode(
@@ -1497,13 +1489,13 @@ export class LoaderState {
       allowToSeek: boolean;
       allowCompact: boolean;
     },
-  ): Node | void {
+  ): State | void {
     let indentStatus = 1; // 1: this>parent, 0: this=parent, -1: this<parent
     let atNewLine = false;
     let hasContent = false;
     let type: Type<KindType>;
 
-    let resultNode: Node = {
+    let state: State = {
       tag: null,
       anchor: null,
       kind: null,
@@ -1531,16 +1523,14 @@ export class LoaderState {
     }
 
     if (indentStatus === 1) {
-      while (
-        true
-      ) {
-        const tag = this.readTagProperty(resultNode.tag);
+      while (true) {
+        const tag = this.readTagProperty(state.tag);
         if (tag) {
-          resultNode.tag = tag;
+          state.tag = tag;
         } else {
-          const anchor = this.readAnchorProperty(resultNode.anchor);
+          const anchor = this.readAnchorProperty(state.anchor);
           if (!anchor) break;
-          resultNode.anchor = anchor;
+          state.anchor = anchor;
         }
 
         if (this.skipSeparationSpace(true, -1)) {
@@ -1572,80 +1562,74 @@ export class LoaderState {
       const blockIndent = this.position - this.lineStart;
 
       if (indentStatus === 1) {
-        const node = this.readBlockSequence(resultNode, blockIndent);
-        if (node) resultNode = node;
+        const newState = this.readBlockSequence(state, blockIndent);
+        if (newState) state = newState;
         if (allowBlockCollections) {
-          if (node) {
+          if (newState) {
             hasContent = true;
           } else {
-            const node = this.readBlockMapping(
-              resultNode,
+            const newState = this.readBlockMapping(
+              state,
               blockIndent,
               flowIndent,
             );
-            if (node) {
-              resultNode = node;
+            if (newState) {
+              state = newState;
               hasContent = true;
             }
           }
         } else {
-          const node = this.readFlowCollection(resultNode, flowIndent);
-          if (node) {
-            resultNode = node;
+          const newState = this.readFlowCollection(state, flowIndent);
+          if (newState) {
+            state = newState;
             hasContent = true;
           } else {
-            const node = this.readBlockScalar(resultNode, flowIndent);
-            const didReadBlock = allowBlockScalars && node;
-            if (node) resultNode = node;
+            const newState = this.readBlockScalar(state, flowIndent);
+            const didReadBlock = allowBlockScalars && newState;
+            if (newState) state = newState;
 
             if (didReadBlock) {
               hasContent = true;
             } else {
-              const node = this.readSingleQuotedScalar(
-                resultNode,
-                flowIndent,
-              );
-              if (node) {
-                resultNode = node;
+              const newState = this.readSingleQuotedScalar(state, flowIndent);
+              if (newState) {
+                state = newState;
                 hasContent = true;
               } else {
-                const node = this.readDoubleQuotedScalar(
-                  resultNode,
-                  flowIndent,
-                );
-                if (node) {
-                  resultNode = node;
+                const newState = this.readDoubleQuotedScalar(state, flowIndent);
+                if (newState) {
+                  state = newState;
                   hasContent = true;
                 } else {
-                  const node = this.readAlias(resultNode);
-                  if (node) {
-                    resultNode = node;
+                  const alias = this.readAlias();
+                  if (alias) {
+                    state.data = alias;
                     hasContent = true;
 
-                    if (node.tag !== null || node.anchor !== null) {
+                    if (state.tag !== null || state.anchor !== null) {
                       throw this.#createError(
                         "Cannot compose node: alias node should not have any properties",
                       );
                     }
                   } else {
-                    const node = this.readPlainScalar(
-                      resultNode,
+                    const newState = this.readPlainScalar(
+                      state,
                       flowIndent,
                       CONTEXT_FLOW_IN === nodeContext,
                     );
-                    if (node) {
-                      resultNode = node;
+                    if (newState) {
+                      state = newState;
                       hasContent = true;
 
-                      if (node.tag === null) {
-                        node.tag = "?";
+                      if (newState.tag === null) {
+                        newState.tag = "?";
                       }
                     }
                   }
                 }
 
-                if (resultNode.anchor !== null) {
-                  this.anchorMap.set(resultNode.anchor, resultNode.data);
+                if (state.anchor !== null) {
+                  this.anchorMap.set(state.anchor, state.data);
                 }
               }
             }
@@ -1654,14 +1638,14 @@ export class LoaderState {
       } else if (indentStatus === 0) {
         // Special case: block sequences are allowed to have same indentation level as the parent.
         // http://www.yaml.org/spec/1.2/spec.html#id2799784
-        const node = this.readBlockSequence(resultNode, blockIndent);
-        hasContent = allowBlockCollections && !!node;
-        if (node) resultNode = node;
+        const newState = this.readBlockSequence(state, blockIndent);
+        hasContent = allowBlockCollections && !!newState;
+        if (newState) state = newState;
       }
     }
 
-    if (resultNode.tag !== null && resultNode.tag !== "!") {
-      if (resultNode.tag === "?") {
+    if (state.tag !== null && state.tag !== "!") {
+      if (state.tag === "?") {
         for (
           let typeIndex = 0;
           typeIndex < this.implicitTypes.length;
@@ -1673,52 +1657,52 @@ export class LoaderState {
           // non-specific tag is only assigned to plain scalars. So, it isn't
           // needed to check for 'kind' conformity.
 
-          if (type.resolve(resultNode.data)) {
-            // `state.result` updated in resolver if matched
-            resultNode.data = type.construct(resultNode.data);
-            resultNode.tag = type.tag;
-            if (resultNode.anchor !== null) {
-              this.anchorMap.set(resultNode.anchor, resultNode.data);
+          if (type.resolve(state.data)) {
+            // `state.data` updated in resolver if matched
+            state.data = type.construct(state.data);
+            state.tag = type.tag;
+            if (state.anchor !== null) {
+              this.anchorMap.set(state.anchor, state.data);
             }
             break;
           }
         }
       } else if (
-        this.typeMap[(resultNode.kind ?? "fallback") as KindType].has(
-          resultNode.tag!,
+        this.typeMap[(state.kind ?? "fallback") as KindType].has(
+          state.tag!,
         )
       ) {
-        const map = this.typeMap[(resultNode.kind ?? "fallback") as KindType];
-        type = map.get(resultNode.tag!)!;
+        const map = this.typeMap[(state.kind ?? "fallback") as KindType];
+        type = map.get(state.tag!)!;
 
-        if (resultNode.data !== null && type.kind !== resultNode.kind) {
+        if (state.data !== null && type.kind !== state.kind) {
           throw this.#createError(
-            `Unacceptable node kind for !<${resultNode.tag}> tag: it should be "${type.kind}", not "${resultNode.kind}"`,
+            `Unacceptable node kind for !<${state.tag}> tag: it should be "${type.kind}", not "${state.kind}"`,
           );
         }
 
-        if (!type.resolve(resultNode.data)) {
-          // `state.result` updated in resolver if matched
+        if (!type.resolve(state.data)) {
+          // `state.data` updated in resolver if matched
           throw this.#createError(
-            `Cannot resolve a node with !<${resultNode.tag}> explicit tag`,
+            `Cannot resolve a node with !<${state.tag}> explicit tag`,
           );
         } else {
-          resultNode.data = type.construct(resultNode.data);
-          if (resultNode.anchor !== null) {
-            this.anchorMap.set(resultNode.anchor, resultNode.data);
+          state.data = type.construct(state.data);
+          if (state.anchor !== null) {
+            this.anchorMap.set(state.anchor, state.data);
           }
         }
       } else {
         throw this.#createError(
-          `Cannot resolve unknown tag !<${resultNode.tag}>`,
+          `Cannot resolve unknown tag !<${state.tag}>`,
         );
       }
     }
 
-    const success = resultNode.tag !== null || resultNode.anchor !== null ||
+    const success = state.tag !== null || state.anchor !== null ||
       hasContent;
     if (!success) return;
-    return resultNode;
+    return state;
   }
 
   readDirectives() {
@@ -1817,7 +1801,7 @@ export class LoaderState {
       );
     }
 
-    const composedNode = this.composeNode({
+    const newState = this.composeNode({
       parentIndent: this.lineIndent - 1,
       nodeContext: CONTEXT_BLOCK_OUT,
       allowToSeek: false,
@@ -1846,7 +1830,7 @@ export class LoaderState {
       );
     }
 
-    return composedNode?.data;
+    return newState?.data;
   }
 
   *readDocuments() {
