@@ -361,10 +361,11 @@ export class LoaderState {
     }
     return data;
   }
-  readBlockSequence(state: State, nodeIndent: number): State | void {
+  readBlockSequence(
+    anchor: string | null | undefined,
+    nodeIndent: number,
+  ): unknown[] | undefined {
     let detected = false;
-
-    const { tag, anchor } = state;
 
     const data: unknown[] = [];
 
@@ -418,7 +419,7 @@ export class LoaderState {
     }
 
     if (!detected) return;
-    return { tag, anchor, kind: "sequence", data };
+    return data;
   }
   mergeMappings(
     destination: Record<string, unknown>,
@@ -601,10 +602,9 @@ export class LoaderState {
     return data;
   }
   readPlainScalar(
-    state: State,
     nodeIndent: number,
     withinFlowCollection: boolean,
-  ): State | void {
+  ): string | unknown[] | Record<string, unknown> | null | void {
     let ch = this.peek();
 
     if (
@@ -684,16 +684,8 @@ export class LoaderState {
       }
 
       if (hasPendingContent) {
-        data = this.captureSegment(
-          data,
-          captureStart,
-          captureEnd,
-          false,
-        );
-        data = this.writeFoldedLines(
-          data,
-          this.line - line,
-        );
+        data = this.captureSegment(data, captureStart, captureEnd, false);
+        data = this.writeFoldedLines(data, this.line - line);
         captureStart = captureEnd = this.position;
         hasPendingContent = false;
       }
@@ -705,11 +697,11 @@ export class LoaderState {
       ch = this.next();
     }
 
-    data = this.captureSegment(data, captureStart, captureEnd, false);
-
-    if (data) return { ...state, kind: "scalar", data };
+    return this.captureSegment(data, captureStart, captureEnd, false);
   }
-  readSingleQuotedScalar(state: State, nodeIndent: number): State | undefined {
+  readSingleQuotedScalar(
+    nodeIndent: number,
+  ): string | unknown[] | Record<string, unknown> | null | void {
     let ch = this.peek();
 
     if (ch !== SINGLE_QUOTE) {
@@ -725,12 +717,7 @@ export class LoaderState {
     ch = this.peek();
     while (ch !== 0) {
       if (ch === SINGLE_QUOTE) {
-        data = this.captureSegment(
-          data,
-          captureStart,
-          this.position,
-          true,
-        );
+        data = this.captureSegment(data, captureStart, this.position, true);
         ch = this.next();
 
         if (ch === SINGLE_QUOTE) {
@@ -738,19 +725,12 @@ export class LoaderState {
           this.position++;
           captureEnd = this.position;
         } else {
-          return { ...state, kind: "scalar", data };
+          return data;
         }
       } else if (isEOL(ch)) {
-        data = this.captureSegment(
-          data,
-          captureStart,
-          captureEnd,
-          true,
-        );
-        data = this.writeFoldedLines(
-          data,
-          this.skipSeparationSpace(false, nodeIndent),
-        );
+        data = this.captureSegment(data, captureStart, captureEnd, true);
+        const count = this.skipSeparationSpace(false, nodeIndent);
+        data = this.writeFoldedLines(data, count);
         captureStart = captureEnd = this.position;
       } else if (
         this.position === this.lineStart &&
@@ -770,7 +750,9 @@ export class LoaderState {
       "Unexpected end of the stream within a single quoted scalar",
     );
   }
-  readDoubleQuotedScalar(state: State, nodeIndent: number): State | undefined {
+  readDoubleQuotedScalar(
+    nodeIndent: number,
+  ): string | unknown[] | Record<string, unknown> | null | void {
     let ch = this.peek();
 
     if (ch !== DOUBLE_QUOTE) {
@@ -786,22 +768,12 @@ export class LoaderState {
     ch = this.peek();
     while (ch !== 0) {
       if (ch === DOUBLE_QUOTE) {
-        data = this.captureSegment(
-          data,
-          captureStart,
-          this.position,
-          true,
-        );
+        data = this.captureSegment(data, captureStart, this.position, true);
         this.position++;
-        return { ...state, kind: "scalar", data };
+        return data;
       }
       if (ch === BACKSLASH) {
-        data = this.captureSegment(
-          data,
-          captureStart,
-          this.position,
-          true,
-        );
+        data = this.captureSegment(data, captureStart, this.position, true);
         ch = this.next();
 
         if (isEOL(ch)) {
@@ -836,16 +808,9 @@ export class LoaderState {
 
         captureStart = captureEnd = this.position;
       } else if (isEOL(ch)) {
-        data = this.captureSegment(
-          data,
-          captureStart,
-          captureEnd,
-          true,
-        );
-        data = this.writeFoldedLines(
-          data,
-          this.skipSeparationSpace(false, nodeIndent),
-        );
+        data = this.captureSegment(data, captureStart, captureEnd, true);
+        const count = this.skipSeparationSpace(false, nodeIndent);
+        data = this.writeFoldedLines(data, count);
         captureStart = captureEnd = this.position;
       } else if (
         this.position === this.lineStart &&
@@ -994,7 +959,9 @@ export class LoaderState {
   }
   // Handles block scaler styles: e.g. '|', '>', '|-' and '>-'.
   // https://yaml.org/spec/1.2.2/#81-block-scalar-styles
-  readBlockScalar(state: State, nodeIndent: number): State | undefined {
+  readBlockScalar(
+    nodeIndent: number,
+  ): string | unknown[] | Record<string, unknown> | null | void {
     let chomping = CHOMPING_CLIP;
     let didReadContent = false;
     let detectedIndent = false;
@@ -1138,7 +1105,7 @@ export class LoaderState {
 
       data = this.captureSegment(data, captureStart, this.position, false);
     }
-    return { ...state, kind: "scalar", data };
+    return data;
   }
   readBlockMapping(
     state: State,
@@ -1328,9 +1295,8 @@ export class LoaderState {
     }
 
     // Expose the resulting mapping.
-    if (detected) {
-      return { tag, anchor, kind: "mapping", data };
-    }
+    if (!detected) return;
+    return { tag, anchor, kind: "mapping", data };
   }
   readTagProperty(tag: string | null | undefined): string | null | undefined {
     let isVerbatim = false;
@@ -1562,10 +1528,13 @@ export class LoaderState {
       const blockIndent = this.position - this.lineStart;
 
       if (indentStatus === 1) {
-        const newState = this.readBlockSequence(state, blockIndent);
-        if (newState) state = newState;
+        const data = this.readBlockSequence(state.anchor, blockIndent);
+        if (data) {
+          state.kind = "sequence";
+          state.data = data;
+        }
         if (allowBlockCollections) {
-          if (newState) {
+          if (data) {
             hasContent = true;
           } else {
             const newState = this.readBlockMapping(
@@ -1584,21 +1553,27 @@ export class LoaderState {
             state = newState;
             hasContent = true;
           } else {
-            const newState = this.readBlockScalar(state, flowIndent);
-            const didReadBlock = allowBlockScalars && newState;
-            if (newState) state = newState;
+            const data = this.readBlockScalar(flowIndent);
+            const success = data !== undefined;
+            const didReadBlock = allowBlockScalars && success;
+            if (success) {
+              state.kind = "scalar";
+              state.data = data;
+            }
 
             if (didReadBlock) {
               hasContent = true;
             } else {
-              const newState = this.readSingleQuotedScalar(state, flowIndent);
-              if (newState) {
-                state = newState;
+              const data = this.readSingleQuotedScalar(flowIndent);
+              if (data) {
+                state.kind = "scalar";
+                state.data = data;
                 hasContent = true;
               } else {
-                const newState = this.readDoubleQuotedScalar(state, flowIndent);
-                if (newState) {
-                  state = newState;
+                const data = this.readDoubleQuotedScalar(flowIndent);
+                if (data !== undefined) {
+                  state.kind = "scalar";
+                  state.data = data;
                   hasContent = true;
                 } else {
                   const alias = this.readAlias();
@@ -1612,17 +1587,17 @@ export class LoaderState {
                       );
                     }
                   } else {
-                    const newState = this.readPlainScalar(
-                      state,
+                    const data = this.readPlainScalar(
                       flowIndent,
                       CONTEXT_FLOW_IN === nodeContext,
                     );
-                    if (newState) {
-                      state = newState;
+                    if (data) {
+                      state.kind = "scalar";
+                      state.data = data;
                       hasContent = true;
 
-                      if (newState.tag === null) {
-                        newState.tag = "?";
+                      if (state.tag === null) {
+                        state.tag = "?";
                       }
                     }
                   }
@@ -1638,9 +1613,12 @@ export class LoaderState {
       } else if (indentStatus === 0) {
         // Special case: block sequences are allowed to have same indentation level as the parent.
         // http://www.yaml.org/spec/1.2/spec.html#id2799784
-        const newState = this.readBlockSequence(state, blockIndent);
-        hasContent = allowBlockCollections && !!newState;
-        if (newState) state = newState;
+        const data = this.readBlockSequence(state.anchor, blockIndent);
+        if (data) {
+          state.kind = "sequence";
+          state.data = data;
+        }
+        hasContent = allowBlockCollections && !!data;
       }
     }
 
