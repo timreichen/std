@@ -181,6 +181,18 @@ function markToString(
   return where;
 }
 
+function writeFoldedLines(
+  data: unknown[] | Record<string, unknown> | string | null,
+  count: number,
+) {
+  if (count === 1) {
+    data += " ";
+  } else if (count > 1) {
+    data += "\n".repeat(count - 1);
+  }
+  return data;
+}
+
 interface State {
   data: unknown[] | Record<string, unknown> | string | null;
   tag: string | null | undefined;
@@ -590,21 +602,12 @@ export class LoaderState {
 
     return false;
   }
-  writeFoldedLines(
-    data: unknown[] | Record<string, unknown> | string | null,
-    count: number,
-  ) {
-    if (count === 1) {
-      data += " ";
-    } else if (count > 1) {
-      data += "\n".repeat(count - 1);
-    }
-    return data;
-  }
+
   readPlainScalar(
+    { tag, anchor }: State,
     nodeIndent: number,
     withinFlowCollection: boolean,
-  ): string | unknown[] | Record<string, unknown> | null | void {
+  ): State | void {
     let ch = this.peek();
 
     if (
@@ -685,7 +688,7 @@ export class LoaderState {
 
       if (hasPendingContent) {
         data = this.captureSegment(data, captureStart, captureEnd, false);
-        data = this.writeFoldedLines(data, this.line - line);
+        data = writeFoldedLines(data, this.line - line);
         captureStart = captureEnd = this.position;
         hasPendingContent = false;
       }
@@ -697,11 +700,14 @@ export class LoaderState {
       ch = this.next();
     }
 
-    return this.captureSegment(data, captureStart, captureEnd, false);
+    data = this.captureSegment(data, captureStart, captureEnd, false);
+    if (!data) return;
+    return { tag, anchor, kind: "scalar", data };
   }
   readSingleQuotedScalar(
+    { tag, anchor }: State,
     nodeIndent: number,
-  ): string | unknown[] | Record<string, unknown> | null | void {
+  ): State | void {
     let ch = this.peek();
 
     if (ch !== SINGLE_QUOTE) {
@@ -725,12 +731,12 @@ export class LoaderState {
           this.position++;
           captureEnd = this.position;
         } else {
-          return data;
+          return { tag, anchor, kind: "scalar", data };
         }
       } else if (isEOL(ch)) {
         data = this.captureSegment(data, captureStart, captureEnd, true);
         const count = this.skipSeparationSpace(false, nodeIndent);
-        data = this.writeFoldedLines(data, count);
+        data = writeFoldedLines(data, count);
         captureStart = captureEnd = this.position;
       } else if (
         this.position === this.lineStart &&
@@ -751,8 +757,9 @@ export class LoaderState {
     );
   }
   readDoubleQuotedScalar(
+    { tag, anchor }: State,
     nodeIndent: number,
-  ): string | unknown[] | Record<string, unknown> | null | void {
+  ): State | void {
     let ch = this.peek();
 
     if (ch !== DOUBLE_QUOTE) {
@@ -770,7 +777,7 @@ export class LoaderState {
       if (ch === DOUBLE_QUOTE) {
         data = this.captureSegment(data, captureStart, this.position, true);
         this.position++;
-        return data;
+        return { tag, anchor, kind: "scalar", data };
       }
       if (ch === BACKSLASH) {
         data = this.captureSegment(data, captureStart, this.position, true);
@@ -810,7 +817,7 @@ export class LoaderState {
       } else if (isEOL(ch)) {
         data = this.captureSegment(data, captureStart, captureEnd, true);
         const count = this.skipSeparationSpace(false, nodeIndent);
-        data = this.writeFoldedLines(data, count);
+        data = writeFoldedLines(data, count);
         captureStart = captureEnd = this.position;
       } else if (
         this.position === this.lineStart &&
@@ -830,7 +837,7 @@ export class LoaderState {
       "Unexpected end of the stream within a double quoted scalar",
     );
   }
-  readFlowCollection(state: State, nodeIndent: number): State | undefined {
+  readFlowCollection(state: State, nodeIndent: number): State | void {
     let ch = this.peek();
     let terminator: number;
     let isMapping = true;
@@ -960,8 +967,9 @@ export class LoaderState {
   // Handles block scaler styles: e.g. '|', '>', '|-' and '>-'.
   // https://yaml.org/spec/1.2.2/#81-block-scalar-styles
   readBlockScalar(
+    { tag, anchor }: State,
     nodeIndent: number,
-  ): string | unknown[] | Record<string, unknown> | null | void {
+  ): State | void {
     let chomping = CHOMPING_CLIP;
     let didReadContent = false;
     let detectedIndent = false;
@@ -1105,13 +1113,13 @@ export class LoaderState {
 
       data = this.captureSegment(data, captureStart, this.position, false);
     }
-    return data;
+    return { tag, anchor, kind: "scalar", data };
   }
   readBlockMapping(
     state: State,
     nodeIndent: number,
     flowIndent: number,
-  ): State | undefined {
+  ): State | void {
     const { tag, anchor } = state;
 
     const data = {};
@@ -1553,27 +1561,23 @@ export class LoaderState {
             state = newState;
             hasContent = true;
           } else {
-            const data = this.readBlockScalar(flowIndent);
-            const success = data !== undefined;
-            const didReadBlock = allowBlockScalars && success;
-            if (success) {
-              state.kind = "scalar";
-              state.data = data;
+            const newState = this.readBlockScalar(state, flowIndent);
+            const didReadBlock = allowBlockScalars && newState;
+            if (newState) {
+              state = newState;
             }
 
             if (didReadBlock) {
               hasContent = true;
             } else {
-              const data = this.readSingleQuotedScalar(flowIndent);
-              if (data) {
-                state.kind = "scalar";
-                state.data = data;
+              const newState = this.readSingleQuotedScalar(state, flowIndent);
+              if (newState) {
+                state = newState;
                 hasContent = true;
               } else {
-                const data = this.readDoubleQuotedScalar(flowIndent);
-                if (data !== undefined) {
-                  state.kind = "scalar";
-                  state.data = data;
+                const newState = this.readDoubleQuotedScalar(state, flowIndent);
+                if (newState) {
+                  state = newState;
                   hasContent = true;
                 } else {
                   const alias = this.readAlias();
@@ -1587,13 +1591,13 @@ export class LoaderState {
                       );
                     }
                   } else {
-                    const data = this.readPlainScalar(
+                    const newState = this.readPlainScalar(
+                      state,
                       flowIndent,
                       CONTEXT_FLOW_IN === nodeContext,
                     );
-                    if (data) {
-                      state.kind = "scalar";
-                      state.data = data;
+                    if (newState) {
+                      state = newState;
                       hasContent = true;
 
                       if (state.tag === null) {
