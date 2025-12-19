@@ -193,6 +193,15 @@ function writeFoldedLines(
   return data;
 }
 
+const INDENT_GREATER = 1;
+const INDENT_EQUAL = 0;
+const INDENT_LESS = -1;
+function getIndentStatus(lineIndent: number, parentIndent: number): -1 | 0 | 1 {
+  if (lineIndent > parentIndent) return INDENT_GREATER;
+  if (lineIndent === parentIndent) return INDENT_EQUAL;
+  return INDENT_LESS;
+}
+
 interface State {
   data: unknown[] | Record<string, unknown> | string | null;
   tag: string | null | undefined;
@@ -373,7 +382,7 @@ export class LoaderState {
     }
     return data;
   }
-  readBlockSequence(
+  readBlockSequenceData(
     anchor: string | null | undefined,
     nodeIndent: number,
   ): unknown[] | undefined {
@@ -603,7 +612,7 @@ export class LoaderState {
     return false;
   }
 
-  readPlainScalar(
+  readPlainScalarData(
     nodeIndent: number,
     withinFlowCollection: boolean,
   ): string | unknown[] | Record<string, unknown> | null | void {
@@ -1450,189 +1459,13 @@ export class LoaderState {
     return this.anchorMap.get(alias);
   }
 
-  composeNode(
-    { parentIndent, nodeContext, allowToSeek, allowCompact }: {
-      parentIndent: number;
-      nodeContext: number;
-      allowToSeek: boolean;
-      allowCompact: boolean;
-    },
-  ): State | void {
-    let indentStatus = 1; // 1: this>parent, 0: this=parent, -1: this<parent
-    let atNewLine = false;
-    let hasContent = false;
-    let type: Type<KindType>;
-
-    let state: State = {
-      tag: null,
-      anchor: null,
-      kind: null,
-      data: null,
-    };
-
-    const allowBlockScalars = CONTEXT_BLOCK_OUT === nodeContext ||
-      CONTEXT_BLOCK_IN === nodeContext;
-
-    let allowBlockCollections = allowBlockScalars;
-    const allowBlockStyles = allowBlockScalars;
-
-    if (allowToSeek) {
-      if (this.skipSeparationSpace(true, -1)) {
-        atNewLine = true;
-
-        if (this.lineIndent > parentIndent) {
-          indentStatus = 1;
-        } else if (this.lineIndent === parentIndent) {
-          indentStatus = 0;
-        } else if (this.lineIndent < parentIndent) {
-          indentStatus = -1;
-        }
-      }
-    }
-
-    if (indentStatus === 1) {
-      while (true) {
-        const tag = this.readTagProperty(state.tag);
-        if (tag) {
-          state.tag = tag;
-        } else {
-          const anchor = this.readAnchorProperty(state.anchor);
-          if (!anchor) break;
-          state.anchor = anchor;
-        }
-
-        if (this.skipSeparationSpace(true, -1)) {
-          atNewLine = true;
-          allowBlockCollections = allowBlockStyles;
-
-          if (this.lineIndent > parentIndent) {
-            indentStatus = 1;
-          } else if (this.lineIndent === parentIndent) {
-            indentStatus = 0;
-          } else if (this.lineIndent < parentIndent) {
-            indentStatus = -1;
-          }
-        } else {
-          allowBlockCollections = false;
-        }
-      }
-    }
-
-    if (allowBlockCollections) {
-      allowBlockCollections = atNewLine || allowCompact;
-    }
-
-    if (indentStatus === 1 || CONTEXT_BLOCK_OUT === nodeContext) {
-      const cond = CONTEXT_FLOW_IN === nodeContext ||
-        CONTEXT_FLOW_OUT === nodeContext;
-      const flowIndent = cond ? parentIndent : parentIndent + 1;
-
-      const blockIndent = this.position - this.lineStart;
-
-      if (indentStatus === 1) {
-        const data = this.readBlockSequence(state.anchor, blockIndent);
-        if (data) {
-          state.kind = "sequence";
-          state.data = data;
-        }
-        if (allowBlockCollections) {
-          if (data) {
-            hasContent = true;
-          } else {
-            const newState = this.readBlockMapping(
-              state,
-              blockIndent,
-              flowIndent,
-            );
-            if (newState) {
-              state = newState;
-              hasContent = true;
-            }
-          }
-        } else {
-          const newState = this.readFlowCollection(state, flowIndent);
-          if (newState) {
-            state = newState;
-            hasContent = true;
-          } else {
-            const data = this.readBlockScalarData(flowIndent);
-            const success = data !== undefined;
-            const didReadBlock = allowBlockScalars && success;
-            if (success) {
-              state.kind = "scalar";
-              state.data = data;
-            }
-
-            if (didReadBlock) {
-              hasContent = true;
-            } else {
-              const data = this.readSingleQuotedScalarData(flowIndent);
-              if (data) {
-                state.kind = "scalar";
-                state.data = data;
-                hasContent = true;
-              } else {
-                const data = this.readDoubleQuotedScalarData(flowIndent);
-                if (data !== undefined) {
-                  state.kind = "scalar";
-                  state.data = data;
-                  hasContent = true;
-                } else {
-                  const alias = this.readAlias();
-                  if (alias) {
-                    state.data = alias;
-                    hasContent = true;
-
-                    if (state.tag !== null || state.anchor !== null) {
-                      throw this.#createError(
-                        "Cannot compose node: alias node should not have any properties",
-                      );
-                    }
-                  } else {
-                    const data = this.readPlainScalar(
-                      flowIndent,
-                      CONTEXT_FLOW_IN === nodeContext,
-                    );
-                    if (data) {
-                      state.kind = "scalar";
-                      state.data = data;
-                      hasContent = true;
-
-                      if (state.tag === null) {
-                        state.tag = "?";
-                      }
-                    }
-                  }
-                }
-
-                if (state.anchor !== null) {
-                  this.anchorMap.set(state.anchor, state.data);
-                }
-              }
-            }
-          }
-        }
-      } else if (indentStatus === 0) {
-        // Special case: block sequences are allowed to have same indentation level as the parent.
-        // http://www.yaml.org/spec/1.2/spec.html#id2799784
-        const data = this.readBlockSequence(state.anchor, blockIndent);
-        if (data) {
-          state.kind = "sequence";
-          state.data = data;
-        }
-        hasContent = allowBlockCollections && !!data;
-      }
-    }
-
-    if (state.tag !== null && state.tag !== "!") {
-      if (state.tag === "?") {
-        for (
-          let typeIndex = 0;
-          typeIndex < this.implicitTypes.length;
-          typeIndex++
-        ) {
-          type = this.implicitTypes[typeIndex]!;
-
+  resolveState(state: State): State {
+    switch (state.tag) {
+      case null:
+      case "!":
+        return state;
+      case "?":
+        for (const type of this.implicitTypes) {
           // Implicit resolving is not allowed for non-scalar types, and '?'
           // non-specific tag is only assigned to plain scalars. So, it isn't
           // needed to check for 'kind' conformity.
@@ -1647,42 +1480,171 @@ export class LoaderState {
             break;
           }
         }
-      } else if (
-        this.typeMap[(state.kind ?? "fallback") as KindType].has(
-          state.tag!,
-        )
-      ) {
-        const map = this.typeMap[(state.kind ?? "fallback") as KindType];
-        type = map.get(state.tag!)!;
+        return state;
+    }
 
-        if (state.data !== null && type.kind !== state.kind) {
-          throw this.#createError(
-            `Unacceptable node kind for !<${state.tag}> tag: it should be "${type.kind}", not "${state.kind}"`,
-          );
-        }
+    const kind = (state.kind ?? "fallback") as KindType;
+    if (!this.typeMap[kind].has(state.tag!)) {
+      throw this.#createError(`Cannot resolve unknown tag !<${state.tag}>`);
+    }
 
-        if (!type.resolve(state.data)) {
-          // `state.data` updated in resolver if matched
-          throw this.#createError(
-            `Cannot resolve a node with !<${state.tag}> explicit tag`,
-          );
+    const map = this.typeMap[kind];
+    const type = map.get(state.tag!)!;
+
+    if (state.data !== null && type.kind !== state.kind) {
+      throw this.#createError(
+        `Unacceptable node kind for !<${state.tag}> tag: it should be "${type.kind}", not "${state.kind}"`,
+      );
+    }
+
+    if (!type.resolve(state.data)) {
+      // `state.data` updated in resolver if matched
+      throw this.#createError(
+        `Cannot resolve a node with !<${state.tag}> explicit tag`,
+      );
+    }
+
+    state.data = type.construct(state.data);
+
+    if (state.anchor !== null) {
+      this.anchorMap.set(state.anchor, state.data);
+    }
+
+    return state;
+  }
+
+  composeNode(
+    { parentIndent, nodeContext, allowToSeek, allowCompact }: {
+      parentIndent: number;
+      nodeContext: number;
+      allowToSeek: boolean;
+      allowCompact: boolean;
+    },
+  ): State | void {
+    const allowBlockScalars = nodeContext === CONTEXT_BLOCK_OUT ||
+      nodeContext === CONTEXT_BLOCK_IN;
+
+    let allowBlockCollections = allowBlockScalars;
+    let indentStatus = INDENT_GREATER;
+    let atNewLine = false;
+
+    if (allowToSeek && this.skipSeparationSpace(true, -1)) {
+      atNewLine = true;
+      indentStatus = getIndentStatus(this.lineIndent, parentIndent);
+    }
+
+    const state: State = { tag: null, anchor: null, kind: null, data: null };
+
+    if (indentStatus === INDENT_GREATER) {
+      while (true) {
+        const tag = this.readTagProperty(state.tag);
+        if (tag) {
+          state.tag = tag;
         } else {
-          state.data = type.construct(state.data);
-          if (state.anchor !== null) {
-            this.anchorMap.set(state.anchor, state.data);
-          }
+          const anchor = this.readAnchorProperty(state.anchor);
+          if (!anchor) break;
+          state.anchor = anchor;
         }
-      } else {
-        throw this.#createError(
-          `Cannot resolve unknown tag !<${state.tag}>`,
-        );
+
+        if (this.skipSeparationSpace(true, -1)) {
+          atNewLine = true;
+          indentStatus = getIndentStatus(this.lineIndent, parentIndent);
+        } else {
+          allowBlockCollections = false;
+        }
+      }
+
+      allowBlockCollections &&= atNewLine || allowCompact;
+
+      const inFlow = nodeContext === CONTEXT_FLOW_IN ||
+        nodeContext === CONTEXT_FLOW_OUT;
+
+      const flowIndent = inFlow ? parentIndent : parentIndent + 1;
+      const blockIndent = this.position - this.lineStart;
+
+      if (allowBlockCollections) {
+        const seq = this.readBlockSequenceData(state.anchor, blockIndent);
+        if (seq) {
+          state.kind = "sequence";
+          state.data = seq;
+          return this.resolveState(state);
+        }
+
+        const mapped = this.readBlockMapping(state, blockIndent, flowIndent);
+        if (mapped) return this.resolveState(mapped);
+      }
+
+      const flow = this.readFlowCollection(state, flowIndent);
+      if (flow) return this.resolveState(flow);
+
+      if (allowBlockScalars) {
+        const blockScalar = this.readBlockScalarData(flowIndent);
+        if (blockScalar !== undefined) {
+          state.kind = "scalar";
+          state.data = blockScalar;
+          return this.resolveState(state);
+        }
+      }
+
+      const singleQuoted = this.readSingleQuotedScalarData(flowIndent);
+      if (singleQuoted) {
+        state.kind = "scalar";
+        state.data = singleQuoted;
+        return this.resolveState(state);
+      }
+
+      const doubleQuoted = this.readDoubleQuotedScalarData(flowIndent);
+      if (doubleQuoted !== undefined) {
+        state.kind = "scalar";
+        state.data = doubleQuoted;
+        return this.resolveState(state);
+      }
+
+      const alias = this.readAlias();
+      if (alias) {
+        if (state.tag || state.anchor) {
+          throw this.#createError(
+            "Cannot compose node: alias node should not have any properties",
+          );
+        }
+        state.data = alias;
+        return this.resolveState(state);
+      }
+
+      const plain = this.readPlainScalarData(
+        flowIndent,
+        nodeContext === CONTEXT_FLOW_IN,
+      );
+      if (plain) {
+        state.kind = "scalar";
+        state.data = plain;
+        state.tag ??= "?";
+
+        if (state.anchor) this.anchorMap.set(state.anchor, state.data);
+        return this.resolveState(state);
+      }
+
+      if (state.anchor) this.anchorMap.set(state.anchor, state.data);
+    }
+
+    // Special case: same-indent block sequence
+    allowBlockCollections &&= atNewLine || allowCompact;
+
+    if (
+      allowBlockCollections &&
+      nodeContext === CONTEXT_BLOCK_OUT &&
+      indentStatus === INDENT_EQUAL
+    ) {
+      const blockIndent = this.position - this.lineStart;
+      const seq = this.readBlockSequenceData(state.anchor, blockIndent);
+      if (seq) {
+        state.kind = "sequence";
+        state.data = seq;
+        return this.resolveState(state);
       }
     }
 
-    const success = state.tag !== null || state.anchor !== null ||
-      hasContent;
-    if (!success) return;
-    return state;
+    if (state.tag || state.anchor) return this.resolveState(state);
   }
 
   readDirectives() {
