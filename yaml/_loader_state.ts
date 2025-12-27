@@ -1459,64 +1459,11 @@ export class LoaderState {
     return this.anchorMap.get(alias);
   }
 
-  resolveState(state: State): State {
+  resolveTag(state: State): State {
     switch (state.tag) {
       case null:
       case "!":
         return state;
-      case "?":
-        for (const type of this.implicitTypes) {
-          // Implicit resolving is not allowed for non-scalar types, and '?'
-          // non-specific tag is only assigned to plain scalars. So, it isn't
-          // needed to check for 'kind' conformity.
-
-          if (type.resolve(state.result)) {
-            // `state.data` updated in resolver if matched
-            state.result = type.construct(state.result);
-            state.tag = type.tag;
-            if (state.anchor !== null) {
-              this.anchorMap.set(state.anchor, state.result);
-            }
-            break;
-          }
-        }
-        return state;
-    }
-
-    const kind = (state.kind ?? "fallback") as KindType;
-    if (!this.typeMap[kind].has(state.tag!)) {
-      throw this.#createError(`Cannot resolve unknown tag !<${state.tag}>`);
-    }
-
-    const map = this.typeMap[kind];
-    const type = map.get(state.tag!)!;
-
-    if (state.result !== null && type.kind !== state.kind) {
-      throw this.#createError(
-        `Unacceptable node kind for !<${state.tag}> tag: it should be "${type.kind}", not "${state.kind}"`,
-      );
-    }
-
-    if (!type.resolve(state.result)) {
-      // `state.data` updated in resolver if matched
-      throw this.#createError(
-        `Cannot resolve a node with !<${state.tag}> explicit tag`,
-      );
-    }
-
-    state.result = type.construct(state.result);
-
-    if (state.anchor !== null) {
-      this.anchorMap.set(state.anchor, state.result);
-    }
-
-    return state;
-  }
-  resolveTag(state: State) {
-    switch (state.tag) {
-      case null:
-      case "!":
-        return;
       case "?":
         for (const type of this.implicitTypes) {
           // Implicit resolving is not allowed for non-scalar types, and '?'
@@ -1530,9 +1477,9 @@ export class LoaderState {
           if (state.anchor !== null) {
             this.anchorMap.set(state.anchor, state.result);
           }
-          break;
+          return state;
         }
-        return;
+        return state;
     }
 
     const kind = (state.kind ?? "fallback") as KindType;
@@ -1561,6 +1508,8 @@ export class LoaderState {
     if (state.anchor !== null) {
       this.anchorMap.set(state.anchor, state.result);
     }
+
+    return state;
   }
   composeNode(
     { parentIndent, nodeContext, allowToSeek, allowCompact }: {
@@ -1616,22 +1565,22 @@ export class LoaderState {
         if (seq) {
           state.kind = "sequence";
           state.result = seq;
-          return this.resolveState(state);
+          return this.resolveTag(state);
         }
 
         const mapped = this.readBlockMapping(state, blockIndent, flowIndent);
-        if (mapped) return this.resolveState(mapped);
+        if (mapped) return this.resolveTag(mapped);
       }
 
       const flow = this.readFlowCollection(state, flowIndent);
-      if (flow) return this.resolveState(flow);
+      if (flow) return this.resolveTag(flow);
 
       if (allowBlockScalars) {
         const blockScalar = this.readBlockScalarData(flowIndent);
         if (blockScalar !== undefined) {
           state.kind = "scalar";
           state.result = blockScalar;
-          return this.resolveState(state);
+          return this.resolveTag(state);
         }
       }
 
@@ -1639,14 +1588,14 @@ export class LoaderState {
       if (singleQuoted) {
         state.kind = "scalar";
         state.result = singleQuoted;
-        return this.resolveState(state);
+        return this.resolveTag(state);
       }
 
       const doubleQuoted = this.readDoubleQuotedScalarData(flowIndent);
       if (doubleQuoted !== undefined) {
         state.kind = "scalar";
         state.result = doubleQuoted;
-        return this.resolveState(state);
+        return this.resolveTag(state);
       }
 
       const alias = this.readAlias();
@@ -1657,7 +1606,7 @@ export class LoaderState {
           );
         }
         state.result = alias;
-        return this.resolveState(state);
+        return this.resolveTag(state);
       }
 
       const plain = this.readPlainScalarData(
@@ -1670,7 +1619,7 @@ export class LoaderState {
         state.tag ??= "?";
 
         if (state.anchor) this.anchorMap.set(state.anchor, state.result);
-        return this.resolveState(state);
+        return this.resolveTag(state);
       }
 
       if (state.anchor) this.anchorMap.set(state.anchor, state.result);
@@ -1689,11 +1638,11 @@ export class LoaderState {
       if (seq) {
         state.kind = "sequence";
         state.result = seq;
-        return this.resolveState(state);
+        return this.resolveTag(state);
       }
     }
 
-    if (state.tag || state.anchor) return this.resolveState(state);
+    if (state.tag || state.anchor) return this.resolveTag(state);
   }
 
   readDirectives() {
