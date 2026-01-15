@@ -136,7 +136,7 @@ function codepointToChar(codepoint: number): string {
 
 const INDENT = 4;
 const MAX_LENGTH = 75;
-const DELIMITERS = "\x00\r\n\x85\u2028\u2029";
+const DELIMITERS = new Set(["\x00", "\r", "\n", "\x85", "\u2028", "\u2029"]);
 
 function getSnippet(buffer: string, position: number): string | null {
   if (!buffer) return null;
@@ -145,7 +145,7 @@ function getSnippet(buffer: string, position: number): string | null {
   let head = "";
   let tail = "";
 
-  while (start > 0 && !DELIMITERS.includes(buffer.charAt(start - 1))) {
+  while (start > 0 && !DELIMITERS.has(buffer.charAt(start - 1))) {
     start--;
     if (position - start > MAX_LENGTH / 2 - 1) {
       head = " ... ";
@@ -154,7 +154,7 @@ function getSnippet(buffer: string, position: number): string | null {
     }
   }
 
-  while (end < buffer.length && !DELIMITERS.includes(buffer.charAt(end))) {
+  while (end < buffer.length && !DELIMITERS.has(buffer.charAt(end))) {
     end++;
     if (end - position > MAX_LENGTH / 2 - 1) {
       tail = " ... ";
